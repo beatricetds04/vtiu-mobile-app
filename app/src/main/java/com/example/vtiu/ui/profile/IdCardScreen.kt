@@ -120,7 +120,7 @@ fun IdCardScreen(
                         ) {
                             Button(
                                 onClick = {
-                                    val idCardUrl = "https://vtiu-lms-production.up.railway.app/static/uploads/id_cards/id_card_${userId}.pdf"
+                                    val idCardUrl = "https://vtiu-lms-production-eb5a.up.railway.app/static/uploads/id_cards/id_card_${userId}.pdf"
                                     val intent = Intent(Intent.ACTION_VIEW, Uri.parse(idCardUrl))
                                     try {
                                         context.startActivity(intent)

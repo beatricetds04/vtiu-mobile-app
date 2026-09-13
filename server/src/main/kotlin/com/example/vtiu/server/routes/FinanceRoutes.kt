@@ -58,7 +58,7 @@ fun Route.financeRoutes() {
                 email = email,
                 amount = amountKobo.toString(),
                 reference = reference,
-                callbackUrl = "https://vtiu-lms-production.up.railway.app/student/paystack/callback",
+                callbackUrl = "https://vtiu-lms-production-eb5a.up.railway.app/student/paystack/callback",
                 metadata = mapOf("user_id" to userId)
             )
 
