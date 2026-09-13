@@ -362,22 +362,22 @@ fun Route.vClassRoutes() {
             val userId = call.parameters["userId"] ?: ""
             println("VClass: Fetching meetings for user $userId")
             val meetings = transaction {
-                val studentProfile = StudentProfiles.selectAll().where { StudentProfiles.userId eq userId }.singleOrNull() 
-                if (studentProfile == null) {
-                    println("VClass: No student profile found for $userId")
+                val userRow = Users.selectAll().where { Users.userId eq userId }.singleOrNull() ?: return@transaction emptyList<VClassMeetingApi>()
+                
+                // SYNC: Filter by REGISTERED COURSES (like Web does)
+                val registeredCourseIds = StudentCourseRegistrations.selectAll().where { StudentCourseRegistrations.studentId eq userRow[Users.id] }
+                    .map { it[StudentCourseRegistrations.courseId] }
+
+                if (registeredCourseIds.isEmpty()) {
+                    println("VClass: No registered courses found for $userId")
                     return@transaction emptyList<VClassMeetingApi>()
                 }
-                
-                val programme = studentProfile[StudentProfiles.currentProgramme]
-                val level = studentProfile[StudentProfiles.programmeLevel].toString()
-                println("VClass: Student profile found. Prog=$programme, Level=$level")
 
                 val query = (Meetings leftJoin Courses).selectAll().where { 
-                    (Courses.programmeName.lowerCase() eq programme.lowercase()) and 
-                    (Courses.programmeLevel.lowerCase() eq level.lowercase())
-                }
+                    Meetings.courseId inList registeredCourseIds
+                }.orderBy(Meetings.scheduledStart, SortOrder.DESC)
                 
-                println("VClass: Query executed. Found ${query.count()} meetings.")
+                println("VClass: Query executed. Found ${query.count()} meetings for registered courses.")
 
                 query.map {
                     val meetingHostId = it[Meetings.hostId]
@@ -401,7 +401,7 @@ fun Route.vClassRoutes() {
                     VClassMeetingApi(
                         id = it[Meetings.id],
                         title = it[Meetings.title],
-                        courseName = it[Courses.name],
+                        courseName = it.getOrNull(Courses.name) ?: "General",
                         teacherName = if (teacher != null) "${teacher[Users.firstName]} ${teacher[Users.lastName]}" else "Teacher",
                         hostId = meetingHostId ?: teacher?.get(Users.id),
                         meetingCode = it[Meetings.meetingCode],
