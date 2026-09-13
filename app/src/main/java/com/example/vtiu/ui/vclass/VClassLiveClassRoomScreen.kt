@@ -103,8 +103,8 @@ fun VClassLiveClassRoomScreen(
     LaunchedEffect(agoraTokenResponse, hasPermissions) {
         if (hasPermissions && agoraTokenResponse != null && meeting.meetingCode.isNotEmpty()) {
             agoraManager.init(agoraTokenResponse!!.appId)
-            // Use only first 8 alphanumeric chars for the Agora channel to match teacher's display
-            val channelId = meeting.meetingCode.filter { it.isLetterOrDigit() }.take(8).uppercase()
+            // Use the exact random eight-character channel code returned by the LMS.
+            val channelId = meeting.meetingCode.trim().uppercase()
             agoraManager.joinChannel(
                 channelName = channelId,
                 uid = numericId,
@@ -125,7 +125,7 @@ fun VClassLiveClassRoomScreen(
 
     LaunchedEffect(meeting.meetingCode, numericId) {
         if (meeting.meetingCode.isNotEmpty() && numericId != 0) {
-            val channelId = meeting.meetingCode.filter { it.isLetterOrDigit() }.take(8).uppercase()
+            val channelId = meeting.meetingCode.trim().uppercase()
             viewModel.loadAgoraToken(channelId, numericId.toString())
         }
     }

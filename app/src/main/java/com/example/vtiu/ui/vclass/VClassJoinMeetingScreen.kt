@@ -8,7 +8,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
-import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.MicOff
 import androidx.compose.material.icons.filled.Videocam
@@ -58,18 +57,6 @@ fun VClassJoinMeetingScreen(
     val meeting = meetingDetail!!
     
     var isMicOn by remember { mutableStateOf(false) }
-    var enteredRoomId by remember { mutableStateOf("") }
-    
-    // Normalize both for comparison. Filter out any non-alphanumeric characters (like dashes)
-    val targetCode = meeting.meetingCode.filter { it.isLetterOrDigit() }.take(8).uppercase()
-    val isIdCorrect = enteredRoomId.trim().uppercase() == targetCode
-
-    // Debugging: help identify why the match might fail
-    LaunchedEffect(enteredRoomId) {
-        if (enteredRoomId.length == 8) {
-            println("VClass: Comparing '$enteredRoomId' with target '$targetCode' (Raw: ${meeting.meetingCode})")
-        }
-    }
 
     Scaffold(
         containerColor = Color(0xFF0F1720),
@@ -108,7 +95,7 @@ fun VClassJoinMeetingScreen(
                     .padding(horizontal = 24.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Spacer(modifier = Modifier.height(24.dp))
+                Spacer(modifier = Modifier.height(48.dp))
 
                 // Session Info Hero Card
                 Card(
@@ -164,58 +151,7 @@ fun VClassJoinMeetingScreen(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(32.dp))
-
-                // Room ID Entry
-                Text(
-                    text = "Enter 8-digit Room ID to verify",
-                    color = Color.White,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Medium,
-                    modifier = Modifier.align(Alignment.Start)
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                OutlinedTextField(
-                    value = enteredRoomId,
-                    onValueChange = { input ->
-                        val filtered = input.uppercase().filter { it.isLetterOrDigit() }
-                        if (filtered.length <= 8) {
-                            enteredRoomId = filtered
-                        }
-                    },
-                    placeholder = { Text("e.g. A1B2C3D4", color = Color.LightGray.copy(alpha = 0.6f)) },
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp),
-                    singleLine = true,
-                    textStyle = LocalTextStyle.current.copy(color = Color.White),
-                    isError = enteredRoomId.isNotEmpty() && !isIdCorrect,
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedTextColor = Color.White,
-                        unfocusedTextColor = Color.White,
-                        cursorColor = VClassPrimary,
-                        focusedBorderColor = if (isIdCorrect) Color.Green else VClassPrimary,
-                        unfocusedBorderColor = if (isIdCorrect) Color.Green else Color.Gray,
-                        errorBorderColor = Color.Red,
-                        focusedContainerColor = Color.White.copy(alpha = 0.05f),
-                        unfocusedContainerColor = Color.White.copy(alpha = 0.05f)
-                    ),
-                    trailingIcon = {
-                        if (isIdCorrect) {
-                            Icon(Icons.Default.CheckCircle, contentDescription = null, tint = Color.Green)
-                        }
-                    }
-                )
-                
-                if (enteredRoomId.isNotEmpty() && !isIdCorrect) {
-                    Text(
-                        text = "Incorrect Room ID. Please enter the 8 characters shared by your teacher.",
-                        color = Color.Red,
-                        fontSize = 12.sp,
-                        modifier = Modifier.padding(top = 4.dp).align(Alignment.Start)
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(24.dp))
+                Spacer(modifier = Modifier.height(48.dp))
 
                 // Restore Mic Button
                 Row(
@@ -228,19 +164,24 @@ fun VClassJoinMeetingScreen(
                         containerColor = if (isMicOn) Color.White.copy(alpha = 0.1f) else Color.Red,
                         contentColor = Color.White,
                         shape = CircleShape,
-                        modifier = Modifier.size(48.dp)
+                        modifier = Modifier.size(56.dp)
                     ) {
-                        Icon(if (isMicOn) Icons.Default.Mic else Icons.Default.MicOff, contentDescription = "Mic")
+                        Icon(
+                            imageVector = if (isMicOn) Icons.Default.Mic else Icons.Default.MicOff, 
+                            contentDescription = "Mic",
+                            modifier = Modifier.size(24.dp)
+                        )
                     }
                     Spacer(modifier = Modifier.width(16.dp))
                     Text(
                         text = if (isMicOn) "Microphone ON" else "Microphone OFF",
                         color = Color.White,
-                        fontSize = 14.sp
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Medium
                     )
                 }
 
-                Spacer(modifier = Modifier.height(32.dp))
+                Spacer(modifier = Modifier.height(64.dp))
 
                 Button(
                     onClick = { onJoinNowClick(meeting.id) },
@@ -249,12 +190,9 @@ fun VClassJoinMeetingScreen(
                         .height(56.dp),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = Color(0xFF00C950),
-                        contentColor = Color.White,
-                        disabledContainerColor = Color.White.copy(alpha = 0.1f),
-                        disabledContentColor = Color.Gray
+                        contentColor = Color.White
                     ),
-                    shape = RoundedCornerShape(28.dp),
-                    enabled = isIdCorrect
+                    shape = RoundedCornerShape(28.dp)
                 ) {
                     Text("Join Now", fontSize = 18.sp, fontWeight = FontWeight.Bold)
                 }

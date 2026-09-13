@@ -23,7 +23,7 @@ import kotlin.random.Random
 
 fun generateRoomId(): String {
     val chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
-    return (1..8).map { chars[Random.nextInt(chars.length)] }.joinToString("")
+    return (1..6).map { chars[Random.nextInt(chars.length)] }.joinToString("")
 }
 
 fun Route.vClassRoutes() {

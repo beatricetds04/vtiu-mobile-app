@@ -134,6 +134,18 @@ data class VClassMeetingApi(
 )
 
 @Serializable
+data class JoinMeetingByCodeApi(
+    @SerialName("app_id") val appId: String,
+    val channel: String,
+    val token: String,
+    val uid: Int,
+    val role: String,
+    @SerialName("channel_profile") val channelProfile: String,
+    @SerialName("meeting_id") val meetingId: Int,
+    val title: String
+)
+
+@Serializable
 data class FeeBalanceApi(
     @SerialName("amount_due") val amountDue: Double,
     @SerialName("amount_paid") val amountPaid: Double,

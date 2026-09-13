@@ -168,6 +168,16 @@ class LmsRepository @Inject constructor(
         }
     }
 
+    suspend fun joinMeetingByCode(roomCode: String): JoinMeetingByCodeApi? {
+        return try {
+            client.get("$baseUrl/vclass/api/meeting/join-by-code") {
+                parameter("room_code", roomCode)
+            }.body()
+        } catch (e: Exception) {
+            null
+        }
+    }
+
     suspend fun getStudentQuizzes(userId: String): List<QuizDetailApi> {
         return try {
             client.get("$baseUrl/api/student/quizzes/$userId").body()
