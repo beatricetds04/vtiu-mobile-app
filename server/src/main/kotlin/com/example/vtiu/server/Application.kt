@@ -22,9 +22,7 @@ import com.example.vtiu.server.redis.RedisFactory
 import org.jetbrains.exposed.sql.transactions.transaction
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.SortOrder
-import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
-import org.jetbrains.exposed.sql.deleteWhere
-import org.jetbrains.exposed.sql.insert
+import java.time.Duration
 
 val paystackClient = HttpClient(CIO) {
     install(ClientContentNegotiation) {
@@ -41,7 +39,6 @@ fun main() {
 }
 
 fun Application.module() {
-    // Initialize Redis & Database in the background to prevent blocking server startup
     launch {
         try {
             RedisFactory.init()
@@ -52,8 +49,8 @@ fun Application.module() {
         }
     }
     install(WebSockets) {
-        pingPeriod = java.time.Duration.ofSeconds(15)
-        timeout = java.time.Duration.ofSeconds(15)
+        pingPeriod = Duration.ofSeconds(15)
+        timeout = Duration.ofSeconds(15)
         maxFrameSize = Long.MAX_VALUE
         masking = false
     }
@@ -81,7 +78,6 @@ fun Application.module() {
 
     routing {
         get("/") {
-            // Returns a simple 200 OK so Flask knows Ktor is alive
             call.respond(HttpStatusCode.OK, mapOf("status" to "Ktor is running smoothly"))
         }
         
@@ -89,20 +85,11 @@ fun Application.module() {
             call.respond(mapOf("status" to "UP"))
         }
 
-        get("/debug/db") {
-            val count = transaction { Meetings.selectAll().count() }
-            val latest = transaction { 
-                Meetings.selectAll().orderBy(Meetings.id to SortOrder.DESC).limit(1).map {
-                    mapOf("id" to it[Meetings.id], "title" to it[Meetings.title])
-                }
-            }
+        get("/api/settings/agora") {
             val settings = transaction { SchoolSettings.selectAll().singleOrNull() }
-            call.respond(mapOf(
-                "meetings_count" to count,
-                "latest_meeting" to latest.firstOrNull(),
-                "agora_app_id" to (settings?.get(SchoolSettings.agoraAppId) ?: "NOT SET"),
-                "db_url" to (System.getenv("DATABASE_URL")?.take(30) ?: "NOT SET")
-            ))
+            // SYNC: Priority to Environment Variable to match Flask bridge
+            val appId = System.getenv("AGORA_APP_ID") ?: settings?.get(SchoolSettings.agoraAppId) ?: "c79f6fe95bad487cafec43820f0200cb"
+            call.respond(mapOf("appId" to appId))
         }
 
         authRoutes()
@@ -112,14 +99,5 @@ fun Application.module() {
         financeRoutes()
         appointmentRoutes()
         chatRoutes()
-        
-        get("/api/settings/agora") {
-            val settings = transaction { SchoolSettings.selectAll().singleOrNull() }
-            if (settings != null) {
-                call.respond(mapOf("appId" to settings[SchoolSettings.agoraAppId]))
-            } else {
-                call.respond(mapOf("appId" to "c79f6fe95bad487cafec43820f0200cb"))
-            }
-        }
     }
 }

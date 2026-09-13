@@ -32,9 +32,7 @@ fun Route.vClassRoutes() {
         get("/vclass/materials/{courseId}") {
             val courseId = call.parameters["courseId"]?.toIntOrNull() ?: 0
             val materials = transaction {
-                // Find course name first since course_id column is missing in materials table
                 val courseName = Courses.selectAll().where { Courses.id eq courseId }.singleOrNull()?.get(Courses.name) ?: ""
-                
                 CourseMaterials.selectAll().where { CourseMaterials.courseName eq courseName }.map {
                     MaterialApi(
                         id = it[CourseMaterials.id],
@@ -126,7 +124,6 @@ fun Route.vClassRoutes() {
             val courseId = call.parameters["courseId"]?.toIntOrNull() ?: 0
             val meetings = transaction {
                 (Meetings innerJoin Courses).selectAll().where { Meetings.courseId eq courseId }.map {
-                    // Try to get hostId from Meeting table first, fallback to TeacherCourseAssignments
                     val hostId = it[Meetings.hostId]
                     val teacher = if (hostId != null) {
                         Users.selectAll().where { Users.id eq hostId }.singleOrNull()
@@ -156,7 +153,6 @@ fun Route.vClassRoutes() {
         get("/student/quizzes/{userId}") {
             val userId = call.parameters["userId"] ?: ""
             val list = transaction {
-                // Simplified: return all quizzes for the student's programme level
                 val studentProfile = StudentProfiles.selectAll().where { StudentProfiles.userId eq userId }.singleOrNull() ?: return@transaction emptyList<QuizDetailApi>()
                 val level = studentProfile[StudentProfiles.programmeLevel].toString()
                 
@@ -246,18 +242,11 @@ fun Route.vClassRoutes() {
 
         get("/vclass/meeting/{meetingId}") {
             val meetingId = call.parameters["meetingId"]?.toIntOrNull() ?: 0
-            println("VClass: Fetching detail for meeting $meetingId")
             val meeting = transaction {
-                // Use leftJoin to be safe if course info is missing
                 val row = (Meetings leftJoin Courses).selectAll().where { Meetings.id eq meetingId }.singleOrNull()
-                if (row == null) {
-                    println("VClass: Meeting $meetingId not found in DB")
-                    return@transaction null
-                }
+                if (row == null) return@transaction null
 
                 val hostIdValue = row[Meetings.hostId]
-                println("VClass: Meeting $meetingId found. Host ID: $hostIdValue")
-                
                 val teacherRow = if (hostIdValue != null) {
                     Users.selectAll().where { Users.id eq hostIdValue }.singleOrNull()
                 } else {
@@ -281,45 +270,25 @@ fun Route.vClassRoutes() {
                     isLive = true
                 )
             }
-            if (meeting != null) {
-                println("VClass: Returning detail for ${meeting.title} - Host: ${meeting.teacherName}")
-                call.respond(meeting)
-            } else {
-                call.respond(HttpStatusCode.NotFound, "Meeting not found")
-            }
+            if (meeting != null) call.respond(meeting) else call.respond(HttpStatusCode.NotFound, "Meeting not found")
         }
 
         // --- Whiteboard (Excalidraw) ---
         get("/vclass/whiteboard/{meetingId}") {
             val meetingId = call.parameters["meetingId"]?.toIntOrNull() ?: 0
-            
             try {
                 val roomUuid = transaction {
                     val meeting = Meetings.selectAll().where { Meetings.id eq meetingId }.singleOrNull()
                     var uuid = meeting?.get(Meetings.whiteboardRoomUuid)
-                    
                     if (uuid == null) {
-                        // Generate a unique Excalidraw room ID and key
-                        // Format: ROOM_ID,SECRET_KEY (Excalidraw uses a 20-char ID and 22-char key typically)
                         val roomId = UUID.randomUUID().toString().replace("-", "").take(20)
                         val key = UUID.randomUUID().toString().replace("-", "").take(22)
                         uuid = "$roomId,$key"
-                        
-                        Meetings.update({ Meetings.id eq meetingId }) {
-                            it[whiteboardRoomUuid] = uuid
-                        }
+                        Meetings.update({ Meetings.id eq meetingId }) { it[whiteboardRoomUuid] = uuid }
                     }
                     uuid
                 }
-
-                val roomUrl = "https://excalidraw.com/#room=$roomUuid"
-                
-                call.respond(WhiteboardRoomResponse(
-                    type = "excalidraw",
-                    roomUrl = roomUrl,
-                    roomUuid = roomUuid!!
-                ))
-                
+                call.respond(WhiteboardRoomResponse(type = "excalidraw", roomUrl = "https://excalidraw.com/#room=$roomUuid", roomUuid = roomUuid!!))
             } catch (e: Exception) {
                 call.respond(HttpStatusCode.InternalServerError, "Whiteboard Error: ${e.message}")
             }
@@ -328,29 +297,15 @@ fun Route.vClassRoutes() {
         get("/agora/token/{channelName}/{userId}") {
             val channelName = call.parameters["channelName"] ?: ""
             val userId = call.parameters["userId"] ?: "0"
-            
             val settings = transaction { SchoolSettings.selectAll().singleOrNull() }
-            if (settings == null || settings[SchoolSettings.agoraAppId].isBlank()) {
-                return@get call.respond(HttpStatusCode.PreconditionFailed, "Agora not configured")
-            }
+            if (settings == null || settings[SchoolSettings.agoraAppId].isBlank()) return@get call.respond(HttpStatusCode.PreconditionFailed, "Agora not configured")
 
             val appId = settings[SchoolSettings.agoraAppId]
             val appCert = settings[SchoolSettings.agoraAppCertificate]
-
-            // If no certificate is set, we are in testing mode
-            if (appCert.isBlank()) {
-                return@get call.respond(AgoraTokenResponse(token = "", appId = appId))
-            }
+            if (appCert.isBlank()) return@get call.respond(AgoraTokenResponse(token = "", appId = appId))
 
             try {
-                val token = AgoraTokenBuilder.buildToken(
-                    appId = appId,
-                    appCertificate = appCert,
-                    channelName = channelName,
-                    uid = userId.toIntOrNull() ?: 0,
-                    role = AgoraTokenBuilder.Role.BROADCASTER, // Standard for classroom
-                    privilegeExpireTime = 3600 // 1 hour
-                )
+                val token = AgoraTokenBuilder.buildToken(appId, appCert, channelName, userId.toIntOrNull() ?: 0, AgoraTokenBuilder.Role.BROADCASTER, 3600)
                 call.respond(AgoraTokenResponse(token = token, appId = appId))
             } catch (e: Exception) {
                 call.respond(HttpStatusCode.InternalServerError, "Token Error: ${e.message}")
@@ -360,47 +315,25 @@ fun Route.vClassRoutes() {
         // --- Student Dashboard Views ---
         get("/student/vclass/meetings/{userId}") {
             val userId = call.parameters["userId"] ?: ""
-            println("VClass: Fetching meetings for user $userId")
             val meetings = transaction {
                 val userRow = Users.selectAll().where { Users.userId eq userId }.singleOrNull() ?: return@transaction emptyList<VClassMeetingApi>()
-                
-                // SYNC: Filter by REGISTERED COURSES (like Web does)
-                val registeredCourseIds = StudentCourseRegistrations.selectAll().where { StudentCourseRegistrations.studentId eq userRow[Users.id] }
-                    .map { it[StudentCourseRegistrations.courseId] }
+                val registeredCourseIds = StudentCourseRegistrations.selectAll().where { StudentCourseRegistrations.studentId eq userRow[Users.id] }.map { it[StudentCourseRegistrations.courseId] }
+                if (registeredCourseIds.isEmpty()) return@transaction emptyList<VClassMeetingApi>()
 
-                if (registeredCourseIds.isEmpty()) {
-                    println("VClass: No registered courses found for $userId")
-                    return@transaction emptyList<VClassMeetingApi>()
-                }
-
-                val query = (Meetings leftJoin Courses).selectAll().where { 
-                    Meetings.courseId inList registeredCourseIds
-                }.orderBy(Meetings.scheduledStart, SortOrder.DESC)
-                
-                println("VClass: Query executed. Found ${query.count()} meetings for registered courses.")
-
-                query.map {
+                (Meetings leftJoin Courses).selectAll().where { Meetings.courseId inList registeredCourseIds }.orderBy(Meetings.scheduledStart, SortOrder.DESC).map {
                     val meetingHostId = it[Meetings.hostId]
                     val teacher = if (meetingHostId != null) {
                         Users.selectAll().where { Users.id eq meetingHostId }.singleOrNull()
                     } else {
-                        (TeacherCourseAssignments innerJoin TeacherProfiles innerJoin Users)
-                            .selectAll().where { TeacherCourseAssignments.courseId eq it[Courses.id] }
-                            .singleOrNull()
+                        (TeacherCourseAssignments innerJoin TeacherProfiles innerJoin Users).selectAll().where { TeacherCourseAssignments.courseId eq it[Courses.id] }.singleOrNull()
                     }
-                    
-                    // Format dates to "yyyy-MM-dd HH:mm:ss" for the app
                     val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
-                    val startStr = it[Meetings.scheduledStart]?.let { dt -> 
-                        LocalDateTime.of(dt.year, dt.monthNumber, dt.dayOfMonth, dt.hour, dt.minute, dt.second).format(formatter)
-                    } ?: ""
-                    val endStr = it[Meetings.scheduledEnd]?.let { dt -> 
-                        LocalDateTime.of(dt.year, dt.monthNumber, dt.dayOfMonth, dt.hour, dt.minute, dt.second).format(formatter)
-                    } ?: ""
+                    val startStr = it[Meetings.scheduledStart]?.let { dt -> LocalDateTime.of(dt.year, dt.monthNumber, dt.dayOfMonth, dt.hour, dt.minute, dt.second).format(formatter) } ?: ""
+                    val endStr = it[Meetings.scheduledEnd]?.let { dt -> LocalDateTime.of(dt.year, dt.monthNumber, dt.dayOfMonth, dt.hour, dt.minute, dt.second).format(formatter) } ?: ""
 
                     VClassMeetingApi(
                         id = it[Meetings.id],
-                        title = it[Meetings.title], // Use the lecture title
+                        title = it[Meetings.title],
                         courseName = it.getOrNull(Courses.name) ?: "General Session",
                         teacherName = if (teacher != null) "${teacher[Users.firstName]} ${teacher[Users.lastName]}" else "Instructor",
                         hostId = meetingHostId ?: teacher?.get(Users.id),
@@ -420,16 +353,8 @@ fun Route.vClassRoutes() {
                 val studentProfile = StudentProfiles.selectAll().where { StudentProfiles.userId eq userId }.singleOrNull() ?: return@transaction emptyList<MaterialApi>()
                 val programme = studentProfile[StudentProfiles.currentProgramme]
                 val level = studentProfile[StudentProfiles.programmeLevel].toString()
-                
                 CourseMaterials.selectAll().where { (CourseMaterials.programmeName eq programme) and (CourseMaterials.programmeLevel eq level) }.map {
-                    MaterialApi(
-                        id = it[CourseMaterials.id],
-                        title = it[CourseMaterials.title],
-                        courseName = it[CourseMaterials.courseName],
-                        fileUrl = it[CourseMaterials.filename],
-                        fileType = it[CourseMaterials.fileType],
-                        uploadDate = it[CourseMaterials.uploadDate].toString()
-                    )
+                    MaterialApi(id = it[CourseMaterials.id], title = it[CourseMaterials.title], courseName = it[CourseMaterials.courseName], fileUrl = it[CourseMaterials.filename], fileType = it[CourseMaterials.fileType], uploadDate = it[CourseMaterials.uploadDate].toString())
                 }
             }
             call.respond(materials)

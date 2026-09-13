@@ -74,10 +74,14 @@ fun VClassLiveClassRoomScreen(
     var hostUid by remember { mutableIntStateOf(meeting.hostId ?: 0) }
     val remoteUsers = agoraManager.remoteUsers
     
-    // Auto-detect host if not provided by server but someone is in the room
-    LaunchedEffect(remoteUsers.size) {
-        if (hostUid == 0 && remoteUsers.isNotEmpty()) {
-            hostUid = remoteUsers.first()
+    // SYNC: Always prioritize whoever is broadcasting in the room as the host
+    LaunchedEffect(remoteUsers) {
+        if (remoteUsers.isNotEmpty()) {
+            val currentHost = remoteUsers.first()
+            if (hostUid != currentHost) {
+                Log.d("VClass", "Switching host UID to active remote user: $currentHost")
+                hostUid = currentHost
+            }
         }
     }
 
