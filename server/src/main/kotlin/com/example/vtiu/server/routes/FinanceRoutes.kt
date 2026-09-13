@@ -15,7 +15,6 @@ import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.transactions.transaction
 import java.time.LocalDateTime
 import io.ktor.client.call.*
-import java.time.LocalDate
 
 fun Route.financeRoutes() {
     route("/api/finance") {
@@ -220,8 +219,10 @@ private fun processSuccessfulPayment(data: PaystackVerifyData) {
     
     transaction {
         val userRow = Users.selectAll().where { Users.userId eq userId }.singleOrNull() ?: return@transaction
+        
+        // SYNC: Fetch current settings to match Flask's logic
         val settings = SchoolSettings.selectAll().singleOrNull()
-        val currentYear = settings?.get(SchoolSettings.currentAcademicYear) ?: LocalDate.now().year.toString()
+        val currentYear = settings?.get(SchoolSettings.currentAcademicYear) ?: "2024/2025"
         val currentSem = settings?.get(SchoolSettings.currentSemester) ?: "First"
         
         StudentFeeTransactions.insert {

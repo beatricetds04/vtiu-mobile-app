@@ -77,7 +77,8 @@ fun Application.module() {
 
     routing {
         get("/") {
-            call.respondText("VTIU Server version 2.0 (Debugging 400)")
+            // Returns a simple 200 OK so Flask knows Ktor is alive
+            call.respond(HttpStatusCode.OK, mapOf("status" to "Ktor is running smoothly"))
         }
         
         get("/health") {
