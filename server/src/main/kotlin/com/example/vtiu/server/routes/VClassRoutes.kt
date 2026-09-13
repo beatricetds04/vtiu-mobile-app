@@ -400,9 +400,9 @@ fun Route.vClassRoutes() {
 
                     VClassMeetingApi(
                         id = it[Meetings.id],
-                        title = it[Meetings.title],
-                        courseName = it.getOrNull(Courses.name) ?: "General",
-                        teacherName = if (teacher != null) "${teacher[Users.firstName]} ${teacher[Users.lastName]}" else "Teacher",
+                        title = it[Meetings.title], // Use the lecture title
+                        courseName = it.getOrNull(Courses.name) ?: "General Session",
+                        teacherName = if (teacher != null) "${teacher[Users.firstName]} ${teacher[Users.lastName]}" else "Instructor",
                         hostId = meetingHostId ?: teacher?.get(Users.id),
                         meetingCode = it[Meetings.meetingCode],
                         start = startStr,

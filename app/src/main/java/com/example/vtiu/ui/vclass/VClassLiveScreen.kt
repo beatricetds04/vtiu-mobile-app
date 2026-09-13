@@ -117,7 +117,10 @@ fun VClassLiveScreen(
                 items(meetings) { meeting ->
                     EnhancedMeetingCard(
                         meeting = meeting,
-                        onJoinClick = { onJoinClick(meeting.id) }
+                        onJoinClick = { 
+                            println("VClass: Joining Meeting ${meeting.id} (Title: ${meeting.title}, Course: ${meeting.courseName})")
+                            onJoinClick(meeting.id) 
+                        }
                     )
                 }
 
@@ -266,7 +269,13 @@ fun EnhancedMeetingCard(
                     Spacer(modifier = Modifier.width(12.dp))
                     
                     Column {
-                        Text(text = meeting.title, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                        // SYNC: Show Meeting Title in bold, matches Web
+                        Text(
+                            text = meeting.title.uppercase(), 
+                            fontWeight = FontWeight.ExtraBold, 
+                            fontSize = 18.sp,
+                            color = Color.Black
+                        )
                         Text(text = meeting.teacherName, fontSize = 12.sp, color = Color.Gray)
                     }
                 }
