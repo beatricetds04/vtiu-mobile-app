@@ -21,6 +21,10 @@ import com.example.vtiu.server.routes.*
 import com.example.vtiu.server.redis.RedisFactory
 import org.jetbrains.exposed.sql.transactions.transaction
 import org.jetbrains.exposed.sql.selectAll
+import org.jetbrains.exposed.sql.SortOrder
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
+import org.jetbrains.exposed.sql.deleteWhere
+import org.jetbrains.exposed.sql.insert
 
 val paystackClient = HttpClient(CIO) {
     install(ClientContentNegotiation) {
@@ -83,6 +87,22 @@ fun Application.module() {
         
         get("/health") {
             call.respond(mapOf("status" to "UP"))
+        }
+
+        get("/debug/db") {
+            val count = transaction { Meetings.selectAll().count() }
+            val latest = transaction { 
+                Meetings.selectAll().orderBy(Meetings.id to SortOrder.DESC).limit(1).map {
+                    mapOf("id" to it[Meetings.id], "title" to it[Meetings.title])
+                }
+            }
+            val settings = transaction { SchoolSettings.selectAll().singleOrNull() }
+            call.respond(mapOf(
+                "meetings_count" to count,
+                "latest_meeting" to latest.firstOrNull(),
+                "agora_app_id" to (settings?.get(SchoolSettings.agoraAppId) ?: "NOT SET"),
+                "db_url" to (System.getenv("DATABASE_URL")?.take(30) ?: "NOT SET")
+            ))
         }
 
         authRoutes()
