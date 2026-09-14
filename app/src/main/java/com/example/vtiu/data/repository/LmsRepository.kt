@@ -745,10 +745,25 @@ class LmsRepository @Inject constructor(
         }
     }
 
-    suspend fun getAgoraToken(channelName: String, userId: String): AgoraTokenResponse? {
+    suspend fun getAgoraToken(channelName: String, userId: String, role: String = "audience"): AgoraTokenResponse? {
         return try {
-            client.get("$baseUrl/api/vclass/agora/token/$channelName/$userId").body<AgoraTokenResponse>()
+            // SYNC: Call Flask (Static URL) for tokens as requested
+            val staticUrl = "https://vtiu-lms-production-eb5a.up.railway.app"
+            val response: HttpResponse = client.post("$staticUrl/api/agora/token") {
+                contentType(ContentType.Application.Json)
+                setBody(mapOf(
+                    "channelName" to channelName,
+                    "uid" to userId,
+                    "role" to role
+                ))
+            }
+            if (response.status == HttpStatusCode.OK) {
+                response.body<AgoraTokenResponse>()
+            } else {
+                null
+            }
         } catch (e: Exception) {
+            println("Agora Token Error: ${e.message}")
             null
         }
     }

@@ -331,7 +331,7 @@ class TeacherViewModel @Inject constructor(
 
     fun loadAgoraToken(channelName: String, userId: String) {
         viewModelScope.launch {
-            _agoraToken.value = repository.getAgoraToken(channelName, userId)
+            _agoraToken.value = repository.getAgoraToken(channelName, userId, role = "publisher")
         }
     }
 }

@@ -293,23 +293,8 @@ fun Route.vClassRoutes() {
             }
         }
 
-        get("/agora/token/{channelName}/{userId}") {
-            val channelName = call.parameters["channelName"] ?: ""
-            val userId = call.parameters["userId"] ?: "0"
-            val settings = transaction { SchoolSettings.selectAll().singleOrNull() }
-            if (settings == null || settings[SchoolSettings.agoraAppId].isBlank()) return@get call.respond(HttpStatusCode.PreconditionFailed, "Agora not configured")
-
-            val appId = settings[SchoolSettings.agoraAppId]
-            val appCert = settings[SchoolSettings.agoraAppCertificate]
-            if (appCert.isBlank()) return@get call.respond(AgoraTokenResponse(token = "", appId = appId))
-
-            try {
-                val token = AgoraTokenBuilder.buildToken(appId, appCert, channelName, userId.toIntOrNull() ?: 0, AgoraTokenBuilder.Role.BROADCASTER, 3600)
-                call.respond(AgoraTokenResponse(token = token, appId = appId))
-            } catch (e: Exception) {
-                call.respond(HttpStatusCode.InternalServerError, "Token Error: ${e.message}")
-            }
-        }
+        // SYNC: Agora Token generation moved to Flask (Web) Backend as requested.
+        // The Android App now calls /api/agora/token on the Flask server.
 
         // --- Student Dashboard Views ---
         get("/student/vclass/meetings/{userId}") {
