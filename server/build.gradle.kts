@@ -1,3 +1,5 @@
+import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
+
 plugins {
     alias(libs.plugins.kotlinjvm)
     alias(libs.plugins.kotlin.serialization)
@@ -41,15 +43,16 @@ dependencies {
     implementation(libs.redis.jedis)
     
     // LiveKit
-    implementation("io.livekit:livekit-server:0.15.1")
+    implementation(libs.livekitServer)
 }
 
 kotlin {
     jvmToolchain(17)
 }
 
-tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile> {
+tasks.withType<KotlinCompile> {
     kotlinOptions {
         jvmTarget = "17"
+        freeCompilerArgs += listOf("-Xskip-metadata-version-check")
     }
 }

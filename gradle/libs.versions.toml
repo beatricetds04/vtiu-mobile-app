@@ -6,12 +6,12 @@ junitVersion = "1.1.5"
 espressoCore = "3.5.1"
 lifecycleRuntimeKtx = "2.8.2"
 activityCompose = "1.9.0"
-kotlin = "2.0.21"
-ksp = "2.0.21-1.0.25"
+kotlin = "2.1.10"
+ksp = "2.1.10-1.0.29"
 shadow = "8.3.0"
 composeBom = "2024.06.00"
 navigation = "2.7.7"
-hilt = "2.52"
+hilt = "2.58"
 hiltNavigationCompose = "1.2.0"
 kotlinxSerialization = "1.6.3"
 coil = "2.6.0"
@@ -29,6 +29,7 @@ hikaricp = "5.1.0"
 kotlinx-datetime = "0.6.0"
 logback = "1.5.6"
 livekit = "2.28.2"
+livekit-compose = "2.4.2"
 livekit-server-ver = "0.15.1"
 
 [libraries]
@@ -68,7 +69,7 @@ androidx-room-ktx = { group = "androidx.room", name = "room-ktx", version.ref = 
 androidx-room-compiler = { group = "androidx.room", name = "room-compiler", version.ref = "room" }
 redis-jedis = { group = "redis.clients", name = "jedis", version.ref = "redis" }
 livekitAndroid = { group = "io.livekit", name = "livekit-android", version.ref = "livekit" }
-livekitCompose = { group = "io.livekit", name = "livekit-android-compose", version.ref = "livekit" }
+livekitCompose = { group = "io.livekit", name = "livekit-android-compose-components", version.ref = "livekit-compose" }
 livekitServer = { group = "io.livekit", name = "livekit-server", version.ref = "livekit-server-ver" }
 
 # Ktor

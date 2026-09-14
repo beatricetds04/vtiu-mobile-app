@@ -4,7 +4,7 @@ import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.application.*
 import io.ktor.server.engine.*
 import io.ktor.server.netty.*
-import io.ktor.server.plugins.contentnegotiation.*
+import io.ktor.server.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.server.plugins.statuspages.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
@@ -21,17 +21,20 @@ import com.example.vtiu.server.routes.*
 import com.example.vtiu.server.redis.RedisFactory
 import org.jetbrains.exposed.sql.transactions.transaction
 import org.jetbrains.exposed.sql.selectAll
-import org.jetbrains.exposed.sql.SortOrder
 import java.time.Duration
 
-val paystackClient = HttpClient(CIO) {
-    install(ClientContentNegotiation) {
-        json(Json {
-            ignoreUnknownKeys = true
-            prettyPrint = true
-        })
+fun createPaystackClient(): HttpClient {
+    return HttpClient(CIO) {
+        install(ClientContentNegotiation) {
+            json(Json {
+                ignoreUnknownKeys = true
+                prettyPrint = true
+            })
+        }
     }
 }
+
+val paystackClient = createPaystackClient()
 
 fun main() {
     embeddedServer(Netty, port = System.getenv("PORT")?.toInt() ?: 8080, host = "0.0.0.0", module = Application::module)
