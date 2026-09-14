@@ -80,13 +80,12 @@ fun TeacherLiveRoomScreen(
                          perms[Manifest.permission.RECORD_AUDIO] == true
     }
 
-    // Auto-join with NO publishing for preview mode
     LaunchedEffect(agoraTokenResponse, hasPermissions) {
         if (agoraTokenResponse != null && hasPermissions && meeting.meetingCode.isNotEmpty()) {
             agoraManager.init(agoraTokenResponse!!.appId)
             agoraManager.startPreview()
-            // Use only first 6 alphanumeric chars for the Agora channel
-            val channelId = meeting.meetingCode.filter { it.isLetterOrDigit() }.take(6).uppercase()
+            // SYNC: Use the full internal UUID code as the channel ID
+            val channelId = meeting.meetingCode.trim()
             agoraManager.joinChannel(
                 channelName = channelId,
                 uid = numericId,
@@ -106,8 +105,8 @@ fun TeacherLiveRoomScreen(
 
     LaunchedEffect(meeting.id) {
         if (meeting.id != 0 && meeting.meetingCode.isNotEmpty()) {
-            // Load Agora Token using the truncated and normalized channel ID
-            val channelId = meeting.meetingCode.filter { it.isLetterOrDigit() }.take(6).uppercase()
+            // Load Agora Token using the full normalized channel ID
+            val channelId = meeting.meetingCode.trim()
             viewModel.loadAgoraToken(channelId, numericId.toString())
         }
     }
