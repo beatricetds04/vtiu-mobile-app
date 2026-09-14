@@ -271,7 +271,7 @@ fun EnhancedMeetingCard(
                     Column {
                         // SYNC: Show Meeting Title in bold, matches Web
                         Text(
-                            text = meeting.title.uppercase(), 
+                            text = meeting.title.ifEmpty { "LECTURE" }.uppercase(), 
                             fontWeight = FontWeight.ExtraBold, 
                             fontSize = 18.sp,
                             color = Color.Black
