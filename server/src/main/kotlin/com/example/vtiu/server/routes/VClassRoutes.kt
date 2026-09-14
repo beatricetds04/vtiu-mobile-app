@@ -4,6 +4,7 @@ import com.example.vtiu.server.models.*
 import com.example.vtiu.server.db.*
 import com.example.vtiu.server.paystackClient
 import com.example.vtiu.server.utils.AgoraTokenBuilder
+import com.example.vtiu.server.utils.LiveKitTokenBuilder
 import io.ktor.client.request.*
 import io.ktor.client.call.*
 import io.ktor.http.*
@@ -293,21 +294,36 @@ fun Route.vClassRoutes() {
             }
         }
 
-        get("/agora/token/{channelName}/{userId}") {
-            val channelName = call.parameters["channelName"] ?: ""
-            val userId = call.parameters["userId"] ?: "0"
-            val settings = transaction { SchoolSettings.selectAll().singleOrNull() }
-            if (settings == null || settings[SchoolSettings.agoraAppId].isBlank()) return@get call.respond(HttpStatusCode.PreconditionFailed, "Agora not configured")
+        get("/livekit/token/{roomName}/{identity}") {
+            val roomName = call.parameters["roomName"] ?: ""
+            val identity = call.parameters["identity"] ?: ""
+            val name = call.request.queryParameters["name"] ?: identity
+            val role = call.request.queryParameters["role"] ?: "audience"
+            
+            val apiKey = System.getenv("LIVEKIT_API_KEY") ?: ""
+            val apiSecret = System.getenv("LIVEKIT_API_SECRET") ?: ""
+            val livekitUrl = System.getenv("LIVEKIT_URL") ?: "wss://vtiu-lms-vda74ntv.livekit.cloud"
 
-            val appId = settings[SchoolSettings.agoraAppId]
-            val appCert = settings[SchoolSettings.agoraAppCertificate]
-            if (appCert.isBlank()) return@get call.respond(AgoraTokenResponse(token = "", appId = appId))
+            if (apiKey.isBlank() || apiSecret.isBlank()) {
+                return@get call.respond(HttpStatusCode.PreconditionFailed, "LiveKit not configured")
+            }
 
             try {
-                val token = AgoraTokenBuilder.buildToken(appId, appCert, channelName, userId.toIntOrNull() ?: 0, AgoraTokenBuilder.Role.BROADCASTER, 3600)
-                call.respond(AgoraTokenResponse(token = token, appId = appId))
+                val isPublisher = role == "publisher"
+                val token = LiveKitTokenBuilder.buildToken(
+                    apiKey = apiKey,
+                    apiSecret = apiSecret,
+                    roomName = roomName,
+                    identity = identity,
+                    name = name,
+                    isPublisher = isPublisher
+                )
+                call.respond(mapOf(
+                    "token" to token,
+                    "serverUrl" to livekitUrl
+                ))
             } catch (e: Exception) {
-                call.respond(HttpStatusCode.InternalServerError, "Token Error: ${e.message}")
+                call.respond(HttpStatusCode.InternalServerError, "LiveKit Token Error: ${e.message}")
             }
         }
 

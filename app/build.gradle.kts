@@ -76,8 +76,10 @@ dependencies {
     implementation(libs.androidx.media3.exoplayer)
     implementation(libs.androidx.media3.ui)
     implementation(libs.androidx.media3.common)
-    implementation(libs.agora.rtc)
-    implementation(libs.agora.screen.capture)
+    implementation("io.livekit:livekit-android:2.28.2")
+    implementation("io.livekit:livekit-android-compose:2.28.2")
+    // implementation(libs.agora.rtc)
+    // implementation(libs.agora.screen.capture)
 
     // Ktor
     implementation(libs.ktor.client.core)

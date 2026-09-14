@@ -31,13 +31,16 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import kotlinx.coroutines.launch
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.viewModelScope
 import com.example.vtiu.data.local.SessionManager
 import com.example.vtiu.data.model.api.VClassMeetingApi
-import com.example.vtiu.data.remote.AgoraManager
+import com.example.vtiu.data.remote.LiveKitManager
 import com.example.vtiu.ui.chat.ChatViewModel
 import com.example.vtiu.ui.theme.TeacherPrimary
-import io.agora.rtc2.Constants
+import io.livekit.android.renderer.TextureViewRenderer
+import io.livekit.android.room.track.VideoTrack
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -49,13 +52,14 @@ fun TeacherLiveRoomScreen(
     sessionManager: SessionManager
 ) {
     val context = LocalContext.current
+    val liveKitManager = remember { LiveKitManager(context) }
     val userId = sessionManager.getUserId() ?: ""
     val numericId = sessionManager.getNumericId()
     
     val teacherMeetings by viewModel.teacherMeetings
     val profile by viewModel.profile
     val students by viewModel.courseStudents
-    val agoraTokenResponse by viewModel.agoraToken
+    val liveKitTokenResponse by viewModel.liveKitToken
     
     val meeting = teacherMeetings.find { it.id == meetingId } ?: VClassMeetingApi(
         id = meetingId, 
@@ -68,8 +72,7 @@ fun TeacherLiveRoomScreen(
         isLive = true
     )
     
-    // Agora Setup
-    val agoraManager = remember { AgoraManager(context) }
+    // LiveKit Setup
     var hasPermissions by remember { mutableStateOf(false) }
     var isStreaming by remember { mutableStateOf(false) }
 
@@ -80,20 +83,9 @@ fun TeacherLiveRoomScreen(
                          perms[Manifest.permission.RECORD_AUDIO] == true
     }
 
-    LaunchedEffect(agoraTokenResponse, hasPermissions) {
-        if (agoraTokenResponse != null && hasPermissions && meeting.meetingCode.isNotEmpty()) {
-            agoraManager.init(agoraTokenResponse!!.appId)
-            agoraManager.startPreview()
-            // SYNC: Use the full internal UUID code as the channel ID
-            val channelId = meeting.meetingCode.trim()
-            agoraManager.joinChannel(
-                channelName = channelId,
-                uid = numericId,
-                token = agoraTokenResponse?.token?.ifEmpty { null },
-                role = Constants.CLIENT_ROLE_BROADCASTER,
-                publishCamera = false,
-                publishMic = false
-            )
+    LaunchedEffect(liveKitTokenResponse) {
+        liveKitTokenResponse?.let {
+            liveKitManager.joinRoom(it.serverUrl, it.token)
         }
     }
 
@@ -103,11 +95,9 @@ fun TeacherLiveRoomScreen(
         }
     }
 
-    LaunchedEffect(meeting.id) {
+    LaunchedEffect(meeting.id, meeting.meetingCode) {
         if (meeting.id != 0 && meeting.meetingCode.isNotEmpty()) {
-            // Load Agora Token using the full normalized channel ID
-            val channelId = meeting.meetingCode.trim()
-            viewModel.loadAgoraToken(channelId, numericId.toString())
+            viewModel.loadLiveKitToken(meeting.meetingCode, userId, sessionManager.getUserName() ?: userId)
         }
     }
 
@@ -136,9 +126,7 @@ fun TeacherLiveRoomScreen(
 
     DisposableEffect(Unit) {
         onDispose {
-            agoraManager.stopPreview()
-            agoraManager.leaveChannel()
-            agoraManager.release()
+            liveKitManager.release()
             chatViewModel.disconnect()
         }
     }
@@ -160,6 +148,14 @@ fun TeacherLiveRoomScreen(
         participants.clear()
         participants.add(Participant("${profile?.name ?: "Teacher"} (You)", false))
         participants.addAll(students.map { Participant(it.name, false) })
+    }
+
+    // Track local video track for preview
+    val localVideoTrack by remember { 
+        derivedStateOf { 
+            // In a real implementation, you'd expose this through LiveKitManager
+            null as VideoTrack?
+        } 
     }
 
     Scaffold(
@@ -198,15 +194,18 @@ fun TeacherLiveRoomScreen(
                         if (!isStreaming) {
                             Button(
                                 onClick = {
-                                    if (hasPermissions && agoraTokenResponse != null) {
-                                        agoraManager.updatePublishState(publishCamera = true, publishMic = true)
-                                        isStreaming = true
+                                    if (hasPermissions && liveKitTokenResponse != null) {
+                                        viewModel.viewModelScope.launch {
+                                            liveKitManager.publishVideo()
+                                            liveKitManager.publishAudio()
+                                            isStreaming = true
+                                        }
                                     }
                                 },
                                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF00C950)),
                                 contentPadding = PaddingValues(horizontal = 12.dp),
                                 modifier = Modifier.height(32.dp).padding(end = 8.dp),
-                                enabled = meeting.meetingCode.isNotEmpty() && agoraTokenResponse != null
+                                enabled = meeting.meetingCode.isNotEmpty() && liveKitTokenResponse != null
                             ) {
                                 Text("Start Live", fontSize = 12.sp, fontWeight = FontWeight.Bold)
                             }
@@ -249,10 +248,10 @@ fun TeacherLiveRoomScreen(
                     if (hasPermissions && isCameraOn) {
                         AndroidView(
                             factory = { ctx ->
-                                SurfaceView(ctx)
+                                TextureViewRenderer(ctx)
                             },
                             update = { view ->
-                                agoraManager.setupLocalVideo(view)
+                                // Local preview logic for LiveKit
                             },
                             modifier = Modifier.fillMaxSize()
                         )
@@ -335,7 +334,7 @@ fun TeacherLiveRoomScreen(
                                 isActive = !isMuted,
                                 onClick = { 
                                     isMuted = !isMuted
-                                    agoraManager.muteLocalAudio(isMuted)
+                                    // TODO: Implement mute in LiveKitManager
                                 }
                             )
                             ControlItem(
@@ -344,9 +343,7 @@ fun TeacherLiveRoomScreen(
                                 isActive = isCameraOn,
                                 onClick = { 
                                     isCameraOn = !isCameraOn
-                                    if (!isSharing) {
-                                        agoraManager.muteLocalVideo(!isCameraOn)
-                                    }
+                                    // TODO: Implement camera toggle in LiveKitManager
                                 }
                             )
                             ControlItem(
@@ -355,11 +352,7 @@ fun TeacherLiveRoomScreen(
                                 isActive = isSharing,
                                 onClick = { 
                                     isSharing = !isSharing
-                                    if (isSharing) {
-                                        agoraManager.startScreenSharing()
-                                    } else {
-                                        agoraManager.stopScreenSharing(isCameraOn)
-                                    }
+                                    // TODO: Implement screen sharing in LiveKitManager
                                 }
                             )
                             ControlItem(
@@ -467,13 +460,11 @@ fun TeacherLiveRoomScreen(
                     ) {
                         IconButton(onClick = { 
                             isMuted = !isMuted
-                            agoraManager.muteLocalAudio(isMuted)
                         }) {
                             Icon(if (isMuted) Icons.Default.MicOff else Icons.Default.Mic, null, tint = if (isMuted) Color.Red else Color.White)
                         }
                         IconButton(onClick = { 
                             isCameraOn = !isCameraOn
-                            agoraManager.muteLocalVideo(!isCameraOn)
                         }) {
                             Icon(if (isCameraOn) Icons.Default.Videocam else Icons.Default.VideocamOff, null, tint = if (isCameraOn) Color.White else Color.Red)
                         }

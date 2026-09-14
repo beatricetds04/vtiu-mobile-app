@@ -551,3 +551,9 @@ data class AgoraTokenResponse(
     val token: String,
     val appId: String
 )
+
+@Serializable
+data class LiveKitTokenResponse(
+    val token: String,
+    val serverUrl: String
+)

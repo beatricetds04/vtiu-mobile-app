@@ -28,6 +28,8 @@ postgresql = "42.7.3"
 hikaricp = "5.1.0"
 kotlinx-datetime = "0.6.0"
 logback = "1.5.6"
+livekit = "2.28.2"
+livekit-server-ver = "0.15.1"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -65,6 +67,9 @@ androidx-room-runtime = { group = "androidx.room", name = "room-runtime", versio
 androidx-room-ktx = { group = "androidx.room", name = "room-ktx", version.ref = "room" }
 androidx-room-compiler = { group = "androidx.room", name = "room-compiler", version.ref = "room" }
 redis-jedis = { group = "redis.clients", name = "jedis", version.ref = "redis" }
+livekitAndroid = { group = "io.livekit", name = "livekit-android", version.ref = "livekit" }
+livekitCompose = { group = "io.livekit", name = "livekit-android-compose", version.ref = "livekit" }
+livekitServer = { group = "io.livekit", name = "livekit-server", version.ref = "livekit-server-ver" }
 
 # Ktor
 ktor-client-core = { group = "io.ktor", name = "ktor-client-core", version.ref = "ktor" }

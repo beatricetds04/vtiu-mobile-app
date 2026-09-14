@@ -745,6 +745,29 @@ class LmsRepository @Inject constructor(
         }
     }
 
+    suspend fun getLiveKitToken(roomName: String, userId: String, userName: String, role: String = "audience"): LiveKitTokenResponse? {
+        return try {
+            val staticUrl = "https://vtiu-lms-production-eb5a.up.railway.app"
+            val response: HttpResponse = client.post("$staticUrl/api/livekit/token") {
+                contentType(ContentType.Application.Json)
+                setBody(mapOf(
+                    "roomName" to roomName,
+                    "identity" to userId,
+                    "name" to userName,
+                    "role" to role
+                ))
+            }
+            if (response.status == HttpStatusCode.OK) {
+                response.body<LiveKitTokenResponse>()
+            } else {
+                null
+            }
+        } catch (e: Exception) {
+            println("LiveKit Token Error: ${e.message}")
+            null
+        }
+    }
+
     suspend fun getAgoraToken(channelName: String, userId: String, role: String = "audience"): AgoraTokenResponse? {
         return try {
             // SYNC: Call Flask (Static URL) for tokens as requested by the live broadcasting setup

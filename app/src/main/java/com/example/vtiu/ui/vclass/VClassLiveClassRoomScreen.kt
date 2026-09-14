@@ -35,12 +35,12 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.vtiu.data.local.SessionManager
 import com.example.vtiu.ui.dashboard.StudentViewModel
 import com.example.vtiu.ui.chat.ChatViewModel
-import com.example.vtiu.data.model.VClassMeeting
 import com.example.vtiu.data.model.api.VClassMeetingApi
-import com.example.vtiu.data.remote.AgoraManager
 import com.example.vtiu.ui.theme.VClassPrimary
-import io.agora.rtc2.Constants
 import kotlinx.coroutines.delay
+
+import com.example.vtiu.data.remote.LiveKitManager
+import io.livekit.android.renderer.TextureViewRenderer
 
 @Composable
 fun VClassLiveClassRoomScreen(
@@ -52,7 +52,7 @@ fun VClassLiveClassRoomScreen(
     sessionManager: SessionManager
 ) {
     val context = LocalContext.current
-    val numericId = sessionManager.getNumericId()
+    val liveKitManager = remember { LiveKitManager(context) }
     
     val studentMeetings by viewModel.vclassMeetings
     val meetingDetail by viewModel.meetingDetail
@@ -68,58 +68,13 @@ fun VClassLiveClassRoomScreen(
         isLive = true
     )
     
-    var isApproved by remember { mutableStateOf(true) } // Simplified for now, or use real logic
-    
-    val agoraManager = remember { AgoraManager(context) }
-    var hostUid by remember { mutableIntStateOf(meeting.hostId ?: 0) }
-    val remoteUsers = agoraManager.remoteUsers
-    
-    // SYNC: Only fallback to first remote user if hostUid is unknown (0)
-    LaunchedEffect(remoteUsers, meeting.hostId) {
-        val serverHostId = meeting.hostId ?: 0
-        if (serverHostId != 0) {
-            hostUid = serverHostId
-            Log.d("VClass", "Using specific host from meeting details: $hostUid")
-        } else if (remoteUsers.isNotEmpty()) {
-            val autoHost = remoteUsers.first()
-            if (hostUid != autoHost) {
-                Log.d("VClass", "No hostId in DB, auto-detecting broadcaster: $autoHost")
-                hostUid = autoHost
-            }
-        }
-    }
-
-    var hasPermissions by remember { mutableStateOf(false) }
-    
-    val whiteboardRoom by viewModel.whiteboardRoom
-    val agoraTokenResponse by viewModel.agoraToken
-
+    val liveKitTokenResponse by viewModel.liveKitToken
     val chatRoomId = "meeting_$meetingId"
-
-    LaunchedEffect(meeting.hostId) {
-        if (meeting.hostId != null) {
-            hostUid = meeting.hostId
-        }
-    }
 
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestMultiplePermissions()
     ) { perms ->
-        hasPermissions = perms.values.all { it }
-    }
-
-    LaunchedEffect(agoraTokenResponse, hasPermissions) {
-        if (hasPermissions && agoraTokenResponse != null && meeting.meetingCode.isNotEmpty()) {
-            agoraManager.init(agoraTokenResponse!!.appId)
-            // SYNC: Use the full internal UUID code as the Agora channel ID
-            val channelId = meeting.meetingCode.trim()
-            agoraManager.joinChannel(
-                channelName = channelId,
-                uid = numericId,
-                token = agoraTokenResponse!!.token.ifEmpty { null },
-                role = Constants.CLIENT_ROLE_AUDIENCE // Default to audience
-            )
-        }
+        // Handle permissions
     }
 
     LaunchedEffect(Unit) {
@@ -131,41 +86,26 @@ fun VClassLiveClassRoomScreen(
         permissionLauncher.launch(arrayOf(Manifest.permission.RECORD_AUDIO))
     }
 
-    LaunchedEffect(meeting.meetingCode, numericId) {
-        if (meeting.meetingCode.isNotEmpty() && numericId != 0) {
-            val channelId = meeting.meetingCode.trim()
-            viewModel.loadAgoraToken(channelId, numericId.toString())
+    LaunchedEffect(meeting.meetingCode, userId) {
+        if (meeting.meetingCode.isNotEmpty() && userId.isNotEmpty()) {
+            viewModel.loadLiveKitToken(meeting.meetingCode, userId, sessionManager.getUserName() ?: userId)
         }
     }
 
-    LaunchedEffect(userId) {
-        if (userId.isNotEmpty()) {
-            viewModel.loadStudentData(userId)
+    LaunchedEffect(liveKitTokenResponse) {
+        liveKitTokenResponse?.let {
+            liveKitManager.joinRoom(it.serverUrl, it.token)
         }
     }
 
     DisposableEffect(Unit) {
         onDispose {
-            agoraManager.leaveChannel()
-            agoraManager.release()
+            liveKitManager.release()
             chatViewModel.disconnect()
         }
     }
 
-    if (!isApproved) {
-        LaunchedEffect(Unit) {
-            delay(5000)
-            isApproved = true
-        }
-    }
-
-    Crossfade(targetState = isApproved, label = "room_state") { approved ->
-        if (!approved) {
-            WaitingRoom(meeting.teacherName ?: "Teacher", onLeaveClick)
-        } else {
-            ActiveTeachingRoom(meeting, hostUid, agoraManager, userId, viewModel, chatViewModel, chatRoomId, onLeaveClick)
-        }
-    }
+    ActiveTeachingRoom(meeting, liveKitManager, userId, viewModel, chatViewModel, chatRoomId, onLeaveClick)
 }
 
 @Composable
@@ -212,8 +152,7 @@ fun WaitingRoom(teacherName: String, onLeaveClick: () -> Unit) {
 @Composable
 fun ActiveTeachingRoom(
     meeting: VClassMeetingApi,
-    hostUid: Int,
-    agoraManager: AgoraManager,
+    liveKitManager: LiveKitManager,
     currentUserId: String,
     viewModel: StudentViewModel,
     chatViewModel: ChatViewModel,
@@ -223,16 +162,10 @@ fun ActiveTeachingRoom(
     var messageText by remember { mutableStateOf("") }
     val messages = chatViewModel.messages
     var isFullScreen by remember { mutableStateOf(false) }
-    var showWhiteboard by remember { mutableStateOf(false) }
     var isMuted by remember { mutableStateOf(true) }
-    val whiteboardRoom by viewModel.whiteboardRoom
     val listState = rememberLazyListState()
-
-    LaunchedEffect(messages.size) {
-        if (messages.isNotEmpty()) {
-            listState.animateScrollToItem(messages.size - 1)
-        }
-    }
+    
+    val videoTracks = liveKitManager.videoTracks
 
     Scaffold(
         containerColor = Color.Black,
@@ -271,13 +204,7 @@ fun ActiveTeachingRoom(
                             IconButton(
                                 onClick = { 
                                     isMuted = !isMuted
-                                    if (isMuted) {
-                                        agoraManager.muteLocalAudio(true)
-                                        agoraManager.setRole(Constants.CLIENT_ROLE_AUDIENCE)
-                                    } else {
-                                        agoraManager.setRole(Constants.CLIENT_ROLE_BROADCASTER)
-                                        agoraManager.muteLocalAudio(false)
-                                    }
+                                    // TODO: Implement mute in LiveKitManager
                                 },
                                 modifier = Modifier.size(32.dp).padding(end = 8.dp)
                             ) {
@@ -286,15 +213,6 @@ fun ActiveTeachingRoom(
                                     contentDescription = "Toggle Mic",
                                     tint = if (isMuted) Color.Red else Color(0xFF00C950)
                                 )
-                            }
-
-                            Button(
-                                onClick = { showWhiteboard = !showWhiteboard },
-                                colors = ButtonDefaults.buttonColors(containerColor = VClassPrimary),
-                                contentPadding = PaddingValues(horizontal = 12.dp),
-                                modifier = Modifier.height(32.dp).padding(end = 8.dp)
-                            ) {
-                                Text(if (showWhiteboard) "Show Video" else "Show Board", fontSize = 12.sp, fontWeight = FontWeight.Bold)
                             }
 
                             Button(
@@ -316,26 +234,15 @@ fun ActiveTeachingRoom(
                         .background(Color.DarkGray),
                     contentAlignment = Alignment.Center
                 ) {
-                    if (showWhiteboard && whiteboardRoom != null) {
+                    if (videoTracks.isNotEmpty()) {
                         AndroidView(
                             factory = { ctx ->
-                                WebView(ctx).apply {
-                                    settings.javaScriptEnabled = true
-                                    settings.domStorageEnabled = true
-                                    webViewClient = WebViewClient()
-                                    loadUrl(whiteboardRoom!!.roomUrl)
+                                TextureViewRenderer(ctx).apply {
+                                    // Initialize if needed (usually handled by SDK but manual init might be required)
                                 }
                             },
-                            modifier = Modifier.fillMaxSize()
-                        )
-                    } else if (hostUid != 0) {
-                        AndroidView(
-                            factory = { ctx ->
-                                SurfaceView(ctx)
-                            },
-                            update = { view ->
-                                Log.d("VClass", "Attaching remote video for UID: $hostUid")
-                                agoraManager.setupRemoteVideo(view, hostUid)
+                            update = { renderer ->
+                                videoTracks.first().addRenderer(renderer)
                             },
                             modifier = Modifier.fillMaxSize()
                         )
@@ -343,7 +250,7 @@ fun ActiveTeachingRoom(
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             Icon(Icons.Default.VideocamOff, contentDescription = null, tint = Color.White.copy(alpha = 0.5f), modifier = Modifier.size(64.dp))
                             Text(
-                                text = if (hostUid != 0) "Connected. Waiting for teacher video..." else "Connecting to session...",
+                                text = "Waiting for teacher video...",
                                 color = Color.White,
                                 fontSize = 14.sp,
                                 textAlign = TextAlign.Center,
@@ -480,32 +387,6 @@ fun ActiveTeachingRoom(
                         modifier = Modifier.background(Color.Black.copy(alpha = 0.3f), CircleShape)
                     ) {
                         Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, contentDescription = "Back", tint = Color.White)
-                    }
-                }
-
-                // Small Mic Overlay at Bottom Right
-                Box(
-                    modifier = Modifier.fillMaxSize().padding(16.dp),
-                    contentAlignment = Alignment.BottomEnd
-                ) {
-                    IconButton(
-                        onClick = { 
-                            isMuted = !isMuted
-                            if (isMuted) {
-                                agoraManager.muteLocalAudio(true)
-                                agoraManager.setRole(Constants.CLIENT_ROLE_AUDIENCE)
-                            } else {
-                                agoraManager.setRole(Constants.CLIENT_ROLE_BROADCASTER)
-                                agoraManager.muteLocalAudio(false)
-                            }
-                        },
-                        modifier = Modifier.background(Color.Black.copy(alpha = 0.3f), CircleShape)
-                    ) {
-                        Icon(
-                            imageVector = if (isMuted) Icons.Default.MicOff else Icons.Default.Mic,
-                            contentDescription = "Toggle Mic",
-                            tint = if (isMuted) Color.Red else Color(0xFF00C950)
-                        )
                     }
                 }
             }

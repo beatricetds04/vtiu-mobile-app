@@ -39,6 +39,9 @@ dependencies {
 
     // Redis
     implementation(libs.redis.jedis)
+    
+    // LiveKit
+    implementation("io.livekit:livekit-server:0.15.1")
 }
 
 kotlin {

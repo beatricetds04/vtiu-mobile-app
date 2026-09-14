@@ -239,9 +239,12 @@ class StudentViewModel @Inject constructor(
         }
     }
 
-    fun loadAgoraToken(channelName: String, userId: String) {
+    private val _liveKitToken = mutableStateOf<LiveKitTokenResponse?>(null)
+    val liveKitToken: State<LiveKitTokenResponse?> = _liveKitToken
+
+    fun loadLiveKitToken(roomName: String, userId: String, userName: String) {
         viewModelScope.launch {
-            _agoraToken.value = repository.getAgoraToken(channelName, userId, role = "audience")
+            _liveKitToken.value = repository.getLiveKitToken(roomName, userId, userName, role = "audience")
         }
     }
 }
