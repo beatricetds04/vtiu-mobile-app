@@ -747,7 +747,7 @@ class LmsRepository @Inject constructor(
 
     suspend fun getAgoraToken(channelName: String, userId: String, role: String = "audience"): AgoraTokenResponse? {
         return try {
-            // SYNC: Call Flask (Static URL) for tokens as requested
+            // SYNC: Call Flask (Static URL) for tokens as requested by the live broadcasting setup
             val staticUrl = "https://vtiu-lms-production-eb5a.up.railway.app"
             val response: HttpResponse = client.post("$staticUrl/api/agora/token") {
                 contentType(ContentType.Application.Json)

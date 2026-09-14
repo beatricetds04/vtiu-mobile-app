@@ -85,6 +85,13 @@ fun Application.module() {
             call.respond(mapOf("status" to "UP"))
         }
 
+        get("/api/settings/agora") {
+            val settings = transaction { SchoolSettings.selectAll().singleOrNull() }
+            // SYNC: Priority to Environment Variable to match Flask bridge
+            val appId = System.getenv("AGORA_APP_ID") ?: settings?.get(SchoolSettings.agoraAppId) ?: "c79f6fe95bad487cafec43820f0200cb"
+            call.respond(mapOf("appId" to appId))
+        }
+
         authRoutes()
         studentRoutes()
         teacherRoutes()
