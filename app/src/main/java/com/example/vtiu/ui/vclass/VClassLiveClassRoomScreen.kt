@@ -215,11 +215,10 @@ fun WaitingRoom(teacherName: String, onLeaveClick: () -> Unit) {
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ActiveTeachingRoom(
     meeting: VClassMeetingApi,
-    hostUid: Int,
+    hostUidInitial: Int,
     agoraManager: AgoraManager,
     currentUserId: String,
     viewModel: StudentViewModel,
@@ -234,6 +233,19 @@ fun ActiveTeachingRoom(
     var isMuted by remember { mutableStateOf(true) }
     val whiteboardRoom by viewModel.whiteboardRoom
     val listState = rememberLazyListState()
+    
+    // Track Host UID dynamically
+    var hostUid by remember { mutableIntStateOf(hostUidInitial) }
+    val remoteUsers = agoraManager.remoteUsers
+
+    LaunchedEffect(remoteUsers) {
+        if (remoteUsers.isNotEmpty()) {
+            val firstUser = remoteUsers.first()
+            if (hostUid != firstUser) {
+                hostUid = firstUser
+            }
+        }
+    }
 
     LaunchedEffect(messages.size) {
         if (messages.isNotEmpty()) {
@@ -336,22 +348,37 @@ fun ActiveTeachingRoom(
                             modifier = Modifier.fillMaxSize()
                         )
                     } else if (hostUid != 0) {
-                        AndroidView(
-                            factory = { ctx ->
-                                // Create a container to hold the SurfaceView
-                                FrameLayout(ctx).apply {
-                                    val surfaceView = SurfaceView(ctx)
-                                    addView(surfaceView)
+                        Box(modifier = Modifier.fillMaxSize()) {
+                            AndroidView(
+                                factory = { ctx ->
+                                    // Create a container to hold the SurfaceView
+                                    FrameLayout(ctx).apply {
+                                        val surfaceView = SurfaceView(ctx)
+                                        addView(surfaceView)
+                                        agoraManager.setupRemoteVideo(surfaceView, hostUid)
+                                    }
+                                },
+                                update = { view ->
+                                    Log.d("VClass", "Updating remote video for UID: $hostUid")
+                                    val surfaceView = (view as FrameLayout).getChildAt(0) as SurfaceView
                                     agoraManager.setupRemoteVideo(surfaceView, hostUid)
-                                }
-                            },
-                            update = { view ->
-                                Log.d("VClass", "Updating remote video for UID: $hostUid")
-                                val surfaceView = (view as FrameLayout).getChildAt(0) as SurfaceView
-                                agoraManager.setupRemoteVideo(surfaceView, hostUid)
-                            },
-                            modifier = Modifier.fillMaxSize()
-                        )
+                                },
+                                modifier = Modifier.fillMaxSize()
+                            )
+                            
+                            // Debug Overlay (Bottom Start)
+                            Column(
+                                modifier = Modifier
+                                    .align(Alignment.BottomStart)
+                                    .padding(bottom = 60.dp, start = 16.dp)
+                                    .background(Color.Black.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
+                                    .padding(8.dp)
+                            ) {
+                                Text("Room: ${meeting.meetingCode.takeLast(6)}", color = Color.Green, fontSize = 10.sp)
+                                Text("Host: $hostUid", color = Color.Green, fontSize = 10.sp)
+                                Text("Active: ${remoteUsers.joinToString()}", color = Color.Yellow, fontSize = 10.sp)
+                            }
+                        }
                     } else {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             Icon(Icons.Default.VideocamOff, contentDescription = null, tint = Color.White.copy(alpha = 0.5f), modifier = Modifier.size(64.dp))
