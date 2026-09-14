@@ -5,6 +5,7 @@ import android.util.Log
 import android.view.SurfaceView
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import android.widget.FrameLayout
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.Crossfade
@@ -42,6 +43,8 @@ import com.example.vtiu.ui.theme.VClassPrimary
 import io.agora.rtc2.Constants
 import kotlinx.coroutines.delay
 
+import android.widget.Toast
+
 @Composable
 fun VClassLiveClassRoomScreen(
     meetingId: Int,
@@ -68,12 +71,19 @@ fun VClassLiveClassRoomScreen(
         isLive = true
     )
     
-    var isApproved by remember { mutableStateOf(true) } // Simplified for now, or use real logic
+    var isApproved by remember { mutableStateOf(true) }
     
     val agoraManager = remember { AgoraManager(context) }
     var hostUid by remember { mutableIntStateOf(meeting.hostId ?: 0) }
     val remoteUsers = agoraManager.remoteUsers
     
+    // Debug Toast for Room Entry
+    LaunchedEffect(meeting.meetingCode) {
+        if (meeting.meetingCode.isNotEmpty()) {
+            Toast.makeText(context, "Entering Room: ${meeting.meetingCode.takeLast(6)}", Toast.LENGTH_SHORT).show()
+        }
+    }
+
     // SYNC: Always prioritize whoever is broadcasting in the room as the host
     LaunchedEffect(remoteUsers) {
         if (remoteUsers.isNotEmpty()) {
@@ -81,6 +91,7 @@ fun VClassLiveClassRoomScreen(
             if (hostUid != currentHost) {
                 Log.d("VClass", "Switching host UID to active remote user: $currentHost")
                 hostUid = currentHost
+                Toast.makeText(context, "Teacher Joined! (ID: $currentHost)", Toast.LENGTH_SHORT).show()
             }
         }
     }
@@ -327,11 +338,17 @@ fun ActiveTeachingRoom(
                     } else if (hostUid != 0) {
                         AndroidView(
                             factory = { ctx ->
-                                SurfaceView(ctx)
+                                // Create a container to hold the SurfaceView
+                                FrameLayout(ctx).apply {
+                                    val surfaceView = SurfaceView(ctx)
+                                    addView(surfaceView)
+                                    agoraManager.setupRemoteVideo(surfaceView, hostUid)
+                                }
                             },
                             update = { view ->
-                                Log.d("VClass", "Attaching remote video for UID: $hostUid")
-                                agoraManager.setupRemoteVideo(view, hostUid)
+                                Log.d("VClass", "Updating remote video for UID: $hostUid")
+                                val surfaceView = (view as FrameLayout).getChildAt(0) as SurfaceView
+                                agoraManager.setupRemoteVideo(surfaceView, hostUid)
                             },
                             modifier = Modifier.fillMaxSize()
                         )
