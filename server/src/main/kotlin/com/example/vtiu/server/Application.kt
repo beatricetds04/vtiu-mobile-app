@@ -23,18 +23,14 @@ import org.jetbrains.exposed.sql.transactions.transaction
 import org.jetbrains.exposed.sql.selectAll
 import java.time.Duration
 
-fun createPaystackClient(): HttpClient {
-    return HttpClient(CIO) {
-        install(ClientContentNegotiation) {
-            json(Json {
-                ignoreUnknownKeys = true
-                prettyPrint = true
-            })
-        }
+val paystackClient = HttpClient(CIO) {
+    install(ClientContentNegotiation) {
+        json(Json {
+            ignoreUnknownKeys = true
+            prettyPrint = true
+        })
     }
 }
-
-val paystackClient = createPaystackClient()
 
 fun main() {
     embeddedServer(Netty, port = System.getenv("PORT")?.toInt() ?: 8080, host = "0.0.0.0", module = Application::module)
