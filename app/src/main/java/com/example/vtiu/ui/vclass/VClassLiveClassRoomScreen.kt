@@ -3,6 +3,8 @@ package com.example.vtiu.ui.vclass
 import android.Manifest
 import android.util.Log
 import android.view.SurfaceView
+import android.webkit.PermissionRequest
+import android.webkit.WebChromeClient
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -26,6 +28,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -167,6 +170,11 @@ fun ActiveTeachingRoom(
     
     val videoTracks = liveKitManager.videoTracks
 
+    // --- WebView Video Mirror Additions ---
+    var customWebUrl by remember { mutableStateOf("") }
+    var showUrlInput by remember { mutableStateOf(false) }
+    var confirmedUrl by remember { mutableStateOf("") }
+
     Scaffold(
         containerColor = Color.Black,
         contentWindowInsets = WindowInsets(0, 0, 0, 0)
@@ -203,6 +211,19 @@ fun ActiveTeachingRoom(
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             IconButton(
                                 onClick = { 
+                                    showUrlInput = !showUrlInput
+                                },
+                                modifier = Modifier.size(32.dp).padding(end = 8.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Language,
+                                    contentDescription = "Custom Web Mirror",
+                                    tint = if (confirmedUrl.isNotEmpty()) Color(0xFF00C950) else Color.White
+                                )
+                            }
+
+                            IconButton(
+                                onClick = { 
                                     isMuted = !isMuted
                                     // TODO: Implement mute in LiveKitManager
                                 },
@@ -225,6 +246,44 @@ fun ActiveTeachingRoom(
                             }
                         }
                     }
+
+                    if (showUrlInput) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(8.dp)
+                                .background(Color.DarkGray.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
+                                .padding(horizontal = 8.dp, vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            OutlinedTextField(
+                                value = customWebUrl,
+                                onValueChange = { customWebUrl = it },
+                                placeholder = { Text("Paste web meeting link...", color = Color.Gray, fontSize = 12.sp) },
+                                modifier = Modifier.weight(1f).height(48.dp),
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedTextColor = Color.White,
+                                    unfocusedTextColor = Color.White,
+                                    cursorColor = Color(0xFF00C950),
+                                    focusedBorderColor = Color(0xFF00C950),
+                                    unfocusedBorderColor = Color.Gray
+                                ),
+                                textStyle = TextStyle(fontSize = 12.sp),
+                                singleLine = true
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Button(
+                                onClick = { 
+                                    confirmedUrl = customWebUrl
+                                    showUrlInput = false
+                                },
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF00C950)),
+                                shape = RoundedCornerShape(8.dp)
+                            ) {
+                                Text("Load", fontSize = 12.sp)
+                            }
+                        }
+                    }
                 }
 
                 Box(
@@ -234,7 +293,36 @@ fun ActiveTeachingRoom(
                         .background(Color.DarkGray),
                     contentAlignment = Alignment.Center
                 ) {
-                    if (videoTracks.isNotEmpty()) {
+                    if (confirmedUrl.isNotEmpty()) {
+                        // WebView Mirror Mode
+                        AndroidView(
+                            factory = { ctx ->
+                                WebView(ctx).apply {
+                                    webViewClient = WebViewClient()
+                                    webChromeClient = object : WebChromeClient() {
+                                        override fun onPermissionRequest(request: PermissionRequest) {
+                                            request.grant(request.resources)
+                                        }
+                                    }
+                                    settings.apply {
+                                        javaScriptEnabled = true
+                                        domStorageEnabled = true
+                                        mediaPlaybackRequiresUserGesture = false
+                                        useWideViewPort = true
+                                        loadWithOverviewMode = true
+                                        allowFileAccess = true
+                                    }
+                                    loadUrl(confirmedUrl)
+                                }
+                            },
+                            update = { webView ->
+                                if (webView.url != confirmedUrl) {
+                                    webView.loadUrl(confirmedUrl)
+                                }
+                            },
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    } else if (videoTracks.isNotEmpty()) {
                         AndroidView(
                             factory = { ctx ->
                                 TextureViewRenderer(ctx).apply {
@@ -250,11 +338,17 @@ fun ActiveTeachingRoom(
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             Icon(Icons.Default.VideocamOff, contentDescription = null, tint = Color.White.copy(alpha = 0.5f), modifier = Modifier.size(64.dp))
                             Text(
-                                text = "Waiting for teacher video...",
+                                text = "Waiting for live stream...",
                                 color = Color.White,
                                 fontSize = 14.sp,
                                 textAlign = TextAlign.Center,
                                 modifier = Modifier.padding(horizontal = 32.dp)
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                text = "Tap the globe icon above to use web mirror",
+                                color = Color.White.copy(alpha = 0.6f),
+                                fontSize = 12.sp
                             )
                         }
                     }
