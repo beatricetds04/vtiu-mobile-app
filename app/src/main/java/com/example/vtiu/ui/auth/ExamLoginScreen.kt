@@ -21,6 +21,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
@@ -172,6 +173,7 @@ fun ExamLoginScreen(
                     Spacer(modifier = Modifier.height(16.dp))
 
                     // Password Field
+                    var passwordVisible by remember { mutableStateOf(false) }
                     Column(
                         modifier = Modifier.fillMaxWidth(),
                         verticalArrangement = Arrangement.spacedBy(8.dp)
@@ -184,7 +186,16 @@ fun ExamLoginScreen(
                             placeholder = { Text("Enter your password") },
                             shape = RoundedCornerShape(28.dp),
                             leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null, tint = Color(0xFF6A11CB)) },
-                            visualTransformation = PasswordVisualTransformation(),
+                            trailingIcon = {
+                                IconButton(onClick = { passwordVisible = !passwordVisible }) {
+                                    Icon(
+                                        imageVector = if (passwordVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff,
+                                        contentDescription = if (passwordVisible) "Hide password" else "Show password",
+                                        tint = Color(0xFF6A11CB)
+                                    )
+                                }
+                            },
+                            visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
                             singleLine = true,
                             enabled = !isLoading
                         )

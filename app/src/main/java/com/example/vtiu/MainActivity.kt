@@ -877,7 +877,7 @@ fun AppDrawer(
 
 @Composable
 fun DrawerHeader(name: String, id: String, role: String, profilePic: String?) {
-    val staticUrl = "https://vtiu-lms-production-eb5a.up.railway.app"
+    val staticUrl = "https://vtiu-lms-production-770d.up.railway.app"
     val firstName = name.split(" ").firstOrNull() ?: name
     val idLabel = if (role == "teacher") "Employee ID" else "Student ID"
     

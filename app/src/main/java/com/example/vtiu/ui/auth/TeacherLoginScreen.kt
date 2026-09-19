@@ -20,6 +20,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
@@ -161,6 +162,7 @@ fun TeacherLoginScreen(
                     }
 
                     // Password Field
+                    var passwordVisible by remember { mutableStateOf(false) }
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text("Password", fontWeight = FontWeight.Bold, fontSize = 14.sp)
                         OutlinedTextField(
@@ -170,7 +172,16 @@ fun TeacherLoginScreen(
                             placeholder = { Text("Enter your password") },
                             shape = RoundedCornerShape(12.dp),
                             leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null, tint = TeacherPrimary) },
-                            visualTransformation = PasswordVisualTransformation(),
+                            trailingIcon = {
+                                IconButton(onClick = { passwordVisible = !passwordVisible }) {
+                                    Icon(
+                                        imageVector = if (passwordVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff,
+                                        contentDescription = if (passwordVisible) "Hide password" else "Show password",
+                                        tint = TeacherPrimary
+                                    )
+                                }
+                            },
+                            visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
                             singleLine = true,
                             enabled = !isLoading
                         )
