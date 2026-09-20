@@ -299,9 +299,9 @@ fun Route.vClassRoutes() {
             val name = call.request.queryParameters["name"] ?: identity
             val role = call.request.queryParameters["role"] ?: "audience"
             
-            val apiKey = System.getenv("LIVEKIT_API_KEY") ?: ""
+            val apiKey = System.getenv("LIVEKIT_API_KEY") ?: "APIXaWigpquJmis"
             val apiSecret = System.getenv("LIVEKIT_API_SECRET") ?: ""
-            val livekitUrl = System.getenv("LIVEKIT_URL") ?: "wss://vtiu-lms-vda74ntv.livekit.cloud"
+            val livekitUrl = System.getenv("LIVEKIT_URL") ?: "wss://vtiu-lzw41bcs.livekit.cloud"
 
             if (apiKey.isBlank() || apiSecret.isBlank()) {
                 return@get call.respond(HttpStatusCode.PreconditionFailed, "LiveKit not configured")
