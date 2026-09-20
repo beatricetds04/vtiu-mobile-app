@@ -27,6 +27,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -143,7 +144,7 @@ fun WaitingRoom(teacherName: String, onLeaveClick: () -> Unit) {
             OutlinedButton(
                 onClick = onLeaveClick,
                 colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
-                border = ButtonDefaults.outlinedButtonBorder.copy(brush = androidx.compose.ui.graphics.SolidColor(Color.White.copy(alpha = 0.3f)))
+                border = ButtonDefaults.outlinedButtonBorder.copy(brush = SolidColor(Color.White.copy(alpha = 0.3f)))
             ) {
                 Text("Leave Meeting")
             }
@@ -164,7 +165,6 @@ fun ActiveTeachingRoom(
 ) {
     var messageText by remember { mutableStateOf("") }
     val messages = chatViewModel.messages
-    var isFullScreen by remember { mutableStateOf(false) }
     var isMuted by remember { mutableStateOf(true) }
     val listState = rememberLazyListState()
     
@@ -174,92 +174,110 @@ fun ActiveTeachingRoom(
     var customWebUrl by remember { mutableStateOf("") }
     var showUrlInput by remember { mutableStateOf(false) }
     var confirmedUrl by remember { mutableStateOf("") }
+    
+    // --- Full Screen & Chat Engagement Defaults ---
+    var isFullScreen by remember { mutableStateOf(true) } // Default to full screen view accessibility
+    var showChatOverlay by remember { mutableStateOf(false) }
 
     Scaffold(
         containerColor = Color.Black,
         contentWindowInsets = WindowInsets(0, 0, 0, 0)
     ) { padding ->
-        Box(
+        Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(padding)
                 .background(Color.Black)
+                .statusBarsPadding() // Safely handle the notch/status bar
         ) {
-            Column(modifier = Modifier.fillMaxSize()) {
-                if (!isFullScreen) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 4.dp, vertical = 0.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
+            // 1. Fixed Header - Stays at the top and never overlaps web content
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(Color(0xFF121212))
+                    .padding(horizontal = 8.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(onClick = onLeaveClick, modifier = Modifier.size(40.dp)) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.KeyboardArrowLeft,
+                            contentDescription = "Leave",
+                            tint = Color.White
+                        )
+                    }
+                    Column(modifier = Modifier.padding(start = 8.dp)) {
+                        Text(meeting.title, fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                        Text("Live • ${meeting.teacherName}", fontSize = 12.sp, color = Color(0xFF00C950))
+                    }
+                }
+                
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(
+                        onClick = { showUrlInput = !showUrlInput },
+                        modifier = Modifier.size(36.dp).padding(end = 4.dp)
                     ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            IconButton(onClick = onLeaveClick) {
-                                Icon(
-                                    imageVector = Icons.AutoMirrored.Filled.KeyboardArrowLeft,
-                                    contentDescription = "Leave",
-                                    tint = Color.White
-                                )
-                            }
-                            Column {
-                                Text(meeting.title, fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                                Text("Live • ${meeting.teacherName}", fontSize = 12.sp, color = Color(0xFF00C950))
-                            }
-                        }
-                        
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            IconButton(
-                                onClick = { 
-                                    showUrlInput = !showUrlInput
-                                },
-                                modifier = Modifier.size(32.dp).padding(end = 8.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Language,
-                                    contentDescription = "Custom Web Mirror",
-                                    tint = if (confirmedUrl.isNotEmpty()) Color(0xFF00C950) else Color.White
-                                )
-                            }
-
-                            IconButton(
-                                onClick = { 
-                                    isMuted = !isMuted
-                                    // TODO: Implement mute in LiveKitManager
-                                },
-                                modifier = Modifier.size(32.dp).padding(end = 8.dp)
-                            ) {
-                                Icon(
-                                    imageVector = if (isMuted) Icons.Default.MicOff else Icons.Default.Mic,
-                                    contentDescription = "Toggle Mic",
-                                    tint = if (isMuted) Color.Red else Color(0xFF00C950)
-                                )
-                            }
-
-                            Button(
-                                onClick = onLeaveClick,
-                                colors = ButtonDefaults.buttonColors(containerColor = Color.Red),
-                                contentPadding = PaddingValues(horizontal = 12.dp),
-                                modifier = Modifier.height(32.dp).padding(end = 8.dp)
-                            ) {
-                                Text("Leave", fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                            }
-                        }
+                        Icon(
+                            imageVector = Icons.Default.Language,
+                            contentDescription = "Custom Web Mirror",
+                            tint = if (confirmedUrl.isNotEmpty()) Color(0xFF00C950) else Color.White
+                        )
                     }
 
-                    if (showUrlInput) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(8.dp)
-                                .background(Color.DarkGray.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
-                                .padding(horizontal = 8.dp, vertical = 4.dp),
-                            verticalAlignment = Alignment.CenterVertically
+                    IconButton(
+                        onClick = { isMuted = !isMuted },
+                        modifier = Modifier.size(36.dp).padding(end = 4.dp)
+                    ) {
+                        Icon(
+                            imageVector = if (isMuted) Icons.Default.MicOff else Icons.Default.Mic,
+                            contentDescription = "Toggle Mic",
+                            tint = if (isMuted) Color.Red else Color(0xFF00C950)
+                        )
+                    }
+
+                    Button(
+                        onClick = onLeaveClick,
+                        colors = ButtonDefaults.buttonColors(containerColor = Color.Red),
+                        contentPadding = PaddingValues(horizontal = 12.dp),
+                        modifier = Modifier.height(32.dp).padding(end = 4.dp),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Text("Leave", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+
+            // 2. URL Input Overlay (Optional)
+            if (showUrlInput) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(Color(0xFF202124))
+                        .padding(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        // Direct authenticated join button
+                        Button(
+                            onClick = {
+                                confirmedUrl = "https://vtiu-lms-production-770d.up.railway.app/vclass/meeting/${meeting.id}?m_uid=$currentUserId"
+                                showUrlInput = false
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = VClassPrimary),
+                            modifier = Modifier.fillMaxWidth().height(44.dp),
+                            shape = RoundedCornerShape(8.dp)
                         ) {
+                            Text("Join Web Mirror (Auto-Login)", fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                        }
+                        
+                        Spacer(modifier = Modifier.height(12.dp))
+                        
+                        // Fallback custom link row
+                        Row(verticalAlignment = Alignment.CenterVertically) {
                             OutlinedTextField(
                                 value = customWebUrl,
                                 onValueChange = { customWebUrl = it },
-                                placeholder = { Text("Paste web meeting link...", color = Color.Gray, fontSize = 12.sp) },
+                                placeholder = { Text("Paste external link...", color = Color.Gray, fontSize = 12.sp) },
                                 modifier = Modifier.weight(1f).height(48.dp),
                                 colors = OutlinedTextFieldDefaults.colors(
                                     focusedTextColor = Color.White,
@@ -274,10 +292,17 @@ fun ActiveTeachingRoom(
                             Spacer(modifier = Modifier.width(8.dp))
                             Button(
                                 onClick = { 
-                                    confirmedUrl = customWebUrl
+                                    val finalUrl = if (customWebUrl.contains("vtiu-lms")) {
+                                        val separator = if (customWebUrl.contains("?")) "&" else "?"
+                                        "$customWebUrl${separator}m_uid=$currentUserId"
+                                    } else {
+                                        customWebUrl
+                                    }
+                                    confirmedUrl = finalUrl
                                     showUrlInput = false
                                 },
                                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF00C950)),
+                                modifier = Modifier.height(48.dp),
                                 shape = RoundedCornerShape(8.dp)
                             ) {
                                 Text("Load", fontSize = 12.sp)
@@ -285,202 +310,208 @@ fun ActiveTeachingRoom(
                         }
                     }
                 }
+            }
 
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .then(if (isFullScreen) Modifier.weight(1f) else Modifier.aspectRatio(16f / 9f))
-                        .background(Color.DarkGray),
-                    contentAlignment = Alignment.Center
+            // 3. Interactive Video/WebView Area - Fills the rest of the screen
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+                    .background(Color.DarkGray)
+            ) {
+                if (confirmedUrl.isNotEmpty()) {
+                    AndroidView(
+                        factory = { ctx ->
+                            WebView(ctx).apply {
+                                webViewClient = WebViewClient()
+                                webChromeClient = object : WebChromeClient() {
+                                    override fun onPermissionRequest(request: PermissionRequest) {
+                                        request.grant(request.resources)
+                                    }
+                                }
+                                settings.apply {
+                                    javaScriptEnabled = true
+                                    domStorageEnabled = true
+                                    mediaPlaybackRequiresUserGesture = false
+                                    useWideViewPort = true
+                                    loadWithOverviewMode = true
+                                    allowFileAccess = true
+                                    builtInZoomControls = true
+                                    displayZoomControls = false
+                                    setSupportZoom(true)
+                                }
+                                // Enable scrolling specifically for interactive web forms
+                                isVerticalScrollBarEnabled = true
+                                isHorizontalScrollBarEnabled = false
+                                loadUrl(confirmedUrl)
+                            }
+                        },
+                        update = { webView ->
+                            if (webView.url != confirmedUrl) {
+                                webView.loadUrl(confirmedUrl)
+                            }
+                        },
+                        modifier = Modifier.fillMaxSize()
+                    )
+                } else if (videoTracks.isNotEmpty()) {
+                    AndroidView(
+                        factory = { ctx -> TextureViewRenderer(ctx) },
+                        update = { renderer -> videoTracks.first().addRenderer(renderer) },
+                        modifier = Modifier.fillMaxSize()
+                    )
+                } else {
+                    // Empty State Placeholder
+                    Column(
+                        modifier = Modifier.fillMaxSize(),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center
+                    ) {
+                        Icon(Icons.Default.VideocamOff, contentDescription = null, tint = Color.White.copy(alpha = 0.5f), modifier = Modifier.size(64.dp))
+                        Text(
+                            text = "Waiting for live stream...",
+                            color = Color.White,
+                            fontSize = 14.sp,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.padding(horizontal = 32.dp)
+                        )
+                    }
+                }
+
+                // REC Badge (Overlay in video area)
+                Surface(
+                    color = Color.Red,
+                    shape = RoundedCornerShape(4.dp),
+                    modifier = Modifier.align(Alignment.TopEnd).padding(16.dp)
                 ) {
-                    if (confirmedUrl.isNotEmpty()) {
-                        // WebView Mirror Mode
-                        AndroidView(
-                            factory = { ctx ->
-                                WebView(ctx).apply {
-                                    webViewClient = WebViewClient()
-                                    webChromeClient = object : WebChromeClient() {
-                                        override fun onPermissionRequest(request: PermissionRequest) {
-                                            request.grant(request.resources)
-                                        }
-                                    }
-                                    settings.apply {
-                                        javaScriptEnabled = true
-                                        domStorageEnabled = true
-                                        mediaPlaybackRequiresUserGesture = false
-                                        useWideViewPort = true
-                                        loadWithOverviewMode = true
-                                        allowFileAccess = true
-                                    }
-                                    loadUrl(confirmedUrl)
-                                }
-                            },
-                            update = { webView ->
-                                if (webView.url != confirmedUrl) {
-                                    webView.loadUrl(confirmedUrl)
-                                }
-                            },
-                            modifier = Modifier.fillMaxSize()
-                        )
-                    } else if (videoTracks.isNotEmpty()) {
-                        AndroidView(
-                            factory = { ctx ->
-                                TextureViewRenderer(ctx).apply {
-                                    // Initialize if needed (usually handled by SDK but manual init might be required)
-                                }
-                            },
-                            update = { renderer ->
-                                videoTracks.first().addRenderer(renderer)
-                            },
-                            modifier = Modifier.fillMaxSize()
-                        )
-                    } else {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Icon(Icons.Default.VideocamOff, contentDescription = null, tint = Color.White.copy(alpha = 0.5f), modifier = Modifier.size(64.dp))
-                            Text(
-                                text = "Waiting for live stream...",
-                                color = Color.White,
-                                fontSize = 14.sp,
-                                textAlign = TextAlign.Center,
-                                modifier = Modifier.padding(horizontal = 32.dp)
-                            )
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Text(
-                                text = "Tap the globe icon above to use web mirror",
-                                color = Color.White.copy(alpha = 0.6f),
-                                fontSize = 12.sp
-                            )
-                        }
+                    Text(
+                        text = "REC",
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+                        color = Color.White,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+
+                // Video Cluster Controls (Bottom Right Overlay)
+                Row(
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    IconButton(
+                        onClick = { showChatOverlay = true },
+                        modifier = Modifier
+                            .padding(end = 8.dp)
+                            .background(Color.Black.copy(alpha = 0.6f), CircleShape)
+                    ) {
+                        Icon(Icons.Default.Mail, contentDescription = "Open Chat", tint = Color.White)
                     }
                     
-                    Surface(
-                        color = Color.Red.copy(alpha = 0.8f),
-                        shape = RoundedCornerShape(4.dp),
-                        modifier = Modifier.align(Alignment.TopEnd).padding(16.dp)
-                    ) {
-                        Text(
-                            text = "REC",
-                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                            color = Color.White,
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-
                     IconButton(
                         onClick = { isFullScreen = !isFullScreen },
-                        modifier = Modifier
-                            .align(Alignment.BottomEnd)
-                            .padding(8.dp)
-                            .background(Color.Black.copy(alpha = 0.5f), CircleShape)
+                        modifier = Modifier.background(Color.Black.copy(alpha = 0.6f), CircleShape)
                     ) {
                         Icon(
                             imageVector = if (isFullScreen) Icons.Default.FullscreenExit else Icons.Default.Fullscreen,
-                            contentDescription = "Toggle Fullscreen",
+                            contentDescription = "Toggle View",
                             tint = Color.White
                         )
                     }
                 }
+            }
+        }
 
-                if (!isFullScreen) {
-                    Column(
-                        modifier = Modifier
-                            .weight(1f)
-                            .clip(RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp))
-                            .background(Color.White)
+        // 4. Bottom Sheet Slide-Up Chat Engagement Overlay
+        if (showChatOverlay) {
+            ModalBottomSheet(
+                onDismissRequest = { showChatOverlay = false },
+                sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+                containerColor = Color.White
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxHeight(0.6f)
+                        .fillMaxWidth()
+                ) {
+                    Text(
+                        text = "Live Class Chat",
+                        modifier = Modifier.padding(16.dp),
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 16.sp
+                    )
+                    
+                    LazyColumn(
+                        modifier = Modifier.weight(1f),
+                        state = listState,
+                        contentPadding = PaddingValues(horizontal = 16.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        Text(
-                            text = "Live Class Chat",
-                            modifier = Modifier.padding(16.dp),
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 16.sp
-                        )
-                        
-                        LazyColumn(
-                            modifier = Modifier.weight(1f),
-                            state = listState,
-                            contentPadding = PaddingValues(horizontal = 16.dp),
-                            verticalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            items(messages) { msg ->
-                                Row(verticalAlignment = Alignment.Top) {
-                                    Box(
-                                        modifier = Modifier
-                                            .size(32.dp)
-                                            .clip(CircleShape)
-                                            .background(VClassPrimary.copy(alpha = 0.1f)),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Icon(Icons.Default.Person, contentDescription = null, modifier = Modifier.size(16.dp), tint = VClassPrimary)
-                                    }
-                                    Spacer(modifier = Modifier.width(12.dp))
-                                    Column {
-                                        Text(text = msg.senderName ?: "User", fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                                        Text(text = msg.message, fontSize = 14.sp)
-                                    }
-                                }
-                            }
-                        }
-
-                        Surface(
-                            shadowElevation = 12.dp,
-                            tonalElevation = 2.dp,
-                            color = Color.White,
-                            shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .imePadding()
-                                .navigationBarsPadding()
-                        ) {
-                            Row(
-                                modifier = Modifier
-                                    .padding(horizontal = 12.dp, vertical = 8.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                TextField(
-                                    value = messageText,
-                                    onValueChange = { messageText = it },
+                        items(messages) { msg ->
+                            Row(verticalAlignment = Alignment.Top) {
+                                Box(
                                     modifier = Modifier
-                                        .weight(1f)
-                                        .clip(RoundedCornerShape(24.dp))
-                                        .background(Color(0xFFF1F3F4)),
-                                    placeholder = { Text("Ask a question...", color = Color.Gray) },
-                                    colors = TextFieldDefaults.colors(
-                                        focusedContainerColor = Color.Transparent,
-                                        unfocusedContainerColor = Color.Transparent,
-                                        focusedIndicatorColor = Color.Transparent,
-                                        unfocusedIndicatorColor = Color.Transparent
-                                    )
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                IconButton(
-                                    onClick = { 
-                                        if (messageText.isNotBlank()) {
-                                            chatViewModel.sendMessage(currentUserId, messageText, chatRoomId)
-                                            messageText = ""
-                                        }
-                                    },
-                                    colors = IconButtonDefaults.iconButtonColors(
-                                        containerColor = VClassPrimary,
-                                        contentColor = Color.White
-                                    ),
-                                    modifier = Modifier.size(44.dp)
+                                        .size(32.dp)
+                                        .clip(CircleShape)
+                                        .background(VClassPrimary.copy(alpha = 0.1f)),
+                                    contentAlignment = Alignment.Center
                                 ) {
-                                    Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "Send", modifier = Modifier.size(20.dp))
+                                    Icon(Icons.Default.Person, contentDescription = null, modifier = Modifier.size(16.dp), tint = VClassPrimary)
+                                }
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Column {
+                                    Text(text = msg.senderName ?: "User", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                    Text(text = msg.message, fontSize = 14.sp)
                                 }
                             }
                         }
                     }
-                }
-            }
-            
-            if (isFullScreen) {
-                Box(modifier = Modifier.fillMaxSize().padding(16.dp), contentAlignment = Alignment.TopStart) {
-                    IconButton(
-                        onClick = { isFullScreen = false },
-                        modifier = Modifier.background(Color.Black.copy(alpha = 0.3f), CircleShape)
+
+                    Surface(
+                        shadowElevation = 12.dp,
+                        tonalElevation = 2.dp,
+                        color = Color.White,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .imePadding()
                     ) {
-                        Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, contentDescription = "Back", tint = Color.White)
+                        Row(
+                            modifier = Modifier
+                                .padding(horizontal = 12.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            TextField(
+                                value = messageText,
+                                onValueChange = { messageText = it },
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clip(RoundedCornerShape(24.dp))
+                                    .background(Color(0xFFF1F3F4)),
+                                placeholder = { Text("Ask a question...", color = Color.Gray) },
+                                colors = TextFieldDefaults.colors(
+                                    focusedContainerColor = Color.Transparent,
+                                    unfocusedContainerColor = Color.Transparent,
+                                    focusedIndicatorColor = Color.Transparent,
+                                    unfocusedIndicatorColor = Color.Transparent
+                                )
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            IconButton(
+                                onClick = { 
+                                    if (messageText.isNotBlank()) {
+                                        chatViewModel.sendMessage(currentUserId, messageText, chatRoomId)
+                                        messageText = ""
+                                    }
+                                },
+                                colors = IconButtonDefaults.iconButtonColors(
+                                    containerColor = VClassPrimary,
+                                    contentColor = Color.White
+                                ),
+                                modifier = Modifier.size(44.dp)
+                            ) {
+                                Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "Send", modifier = Modifier.size(20.dp))
+                            }
+                        }
                     }
                 }
             }
